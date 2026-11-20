@@ -51,7 +51,7 @@ def validate_challenger(rows:pd.DataFrame,min_train=30,min_validation=12):
         except (ValueError,RuntimeError,OverflowError):
             continue
     if not records:
-        return {"status":"insufficient_history","n":0,"promote":False,
+        return {"status":"insufficient_history","n":0,"promote_xgboost":False,
                 "reason":"No eligible chronological XGBoost validation folds."}
     df=pd.DataFrame(records)
     xgb=metrics(df.actual.to_numpy(),df.xgb.to_numpy())
@@ -64,13 +64,40 @@ def validate_challenger(rows:pd.DataFrame,min_train=30,min_validation=12):
     n=len(df)
     calibrated=(n>=min_validation and 0.65<=coverage<=0.95 and crossing<=0.10)
     promote=(n>=min_validation and xgb["mae"] is not None and best_baseline[1]["mae"] is not None and xgb["mae"]<best_baseline[1]["mae"])
+    holdout_rows=rows[rows.target_period.isin(reserve)] if reserve else rows.iloc[0:0]
+    holdout_records=[]
+    for origin in sorted(holdout_rows.origin.unique()):
+        train=eligible_training(dev,origin); test=holdout_rows[holdout_rows.origin==origin]
+        if len(train)<min_train or test.empty: continue
+        try:
+            pm=_model(train)
+            qms={q:_model(train,"reg:quantileerror",q) for q in QUANTILES}
+            pp=pm.predict(test[FEATURES])
+            qp={q:m.predict(test[FEATURES]) for q,m in qms.items()}
+            for i,row in enumerate(test.itertuples()):
+                a=float(row.anchor_count)
+                holdout_records.append({"actual":float(row.target_count),
+                    "xgboost":float(a*np.exp(float(pp[i]))),
+                    "q10":float(a*np.exp(float(qp[0.10][i]))),
+                    "q50":float(a*np.exp(float(qp[0.50][i]))),
+                    "q90":float(a*np.exp(float(qp[0.90][i])))})
+        except (ValueError,RuntimeError,OverflowError):
+            continue
+    final_test={"reserved":bool(reserve),"evaluated":bool(holdout_records),
+        "n":len(holdout_records),"selection_used":False}
+    if holdout_records:
+        hdf=pd.DataFrame(holdout_records)
+        final_test["xgboost"]=metrics(hdf.actual.to_numpy(),hdf.xgboost.to_numpy())
+        final_test["interval"]={"coverage":float(((hdf.actual>=np.minimum(hdf.q10,hdf.q90))&(hdf.actual<=np.maximum(hdf.q10,hdf.q90))).mean()),
+          "mean_width":float(np.mean(np.abs(hdf.q90-hdf.q10))),
+          "crossing_rate":float((hdf.q10>hdf.q90).mean())}
     return {"status":"ok","n":n,"xgboost":xgb,"flat":flat,"trend":trend,
       "best_baseline":best_baseline[0],"promote_xgboost":bool(promote),
       "interval":{"nominal_level":0.80,"empirical_coverage":coverage,
         "mean_width":interval_width,"crossing_rate":crossing,
         "calibration_adequate":bool(calibrated),"pinball_q10":pinball(df.actual,df.q10,0.10),
         "pinball_q50":pinball(df.actual,df.q50,0.50),"pinball_q90":pinball(df.actual,df.q90,0.90)},
-      "final_test":{"reserved":bool(reserve),"periods":[str(x) for x in sorted(reserve)],"used_for_selection":False}}
+      "final_test":{**final_test,"periods":[str(x) for x in sorted(reserve)]}}
 
 def fit_final_models(train):
     return {"point":_model(train),
