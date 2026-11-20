@@ -28,3 +28,39 @@ html[data-theme="dark"] footer{color:#8498a6}
 .theme-toggle:hover{border-color:#9aafb9}
 html[data-theme="dark"] .theme-toggle{background:#1b3040;border-color:#354b5a;color:#d8e5ed}
 @media(max-width:700px){.top-actions{gap:7px}.theme-toggle{padding:8px}.theme-toggle span{display:none}}
+
+
+/* Supabase account and saved-series panel */
+.account-panel{background:#fff;border:1px solid #e5ecef;border-radius:10px;padding:13px 16px;margin:0 0 17px;box-shadow:0 2px 8px #16334a05}
+.account-summary{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.account-heading{display:flex;align-items:center;gap:10px;min-width:0}
+.account-icon{width:32px;height:32px;border-radius:9px;background:#edf6f5;color:#25837d;display:grid;place-items:center;flex:none}
+.account-heading strong,.account-heading small{display:block}
+.account-heading strong{font:700 11px Manrope,sans-serif;color:#1b3448}
+.account-heading small{font-size:9px;color:#87959e;margin-top:3px;overflow-wrap:anywhere}
+.account-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.account-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid #1b817b;background:#1b817b;color:#fff;padding:8px 11px;border-radius:7px;font:600 10px 'DM Sans';cursor:pointer}
+.account-button.secondary{background:#fff;border-color:#dce5e9;color:#536775}
+.account-button:disabled{opacity:.55;cursor:not-allowed}
+.auth-form{display:grid;grid-template-columns:1fr 1fr auto;gap:10px;align-items:end;border-top:1px solid #edf1f3;margin-top:13px;padding-top:13px}
+.auth-form label{display:grid;gap:5px;font-size:9px;color:#687985}
+.auth-form input{width:100%;border:1px solid #dce5e9;border-radius:6px;padding:9px 10px;font:11px 'DM Sans';color:#183449;background:#fff}
+.auth-mode{grid-column:1/-1;display:flex;gap:6px}
+.auth-mode button{border:1px solid #dce5e9;background:#fff;color:#647682;border-radius:6px;padding:6px 10px;font:600 9px 'DM Sans';cursor:pointer}
+.auth-mode button.selected{border-color:#1b817b;color:#1b817b;background:#edf6f5}
+.saved-series{border-top:1px solid #edf1f3;margin-top:12px;padding-top:10px}
+.saved-heading{font-size:9px;font-weight:700;color:#74838d;letter-spacing:.5px;margin-bottom:6px}
+.saved-heading span{margin-left:5px;color:#1b817b}
+.saved-row{display:flex;align-items:center;justify-content:space-between;padding:6px 0;font-size:10px;color:#405968}
+.saved-row button{border:0;background:transparent;color:#8999a3;cursor:pointer;padding:4px}
+.saved-series p,.account-message{font-size:9px;line-height:1.5;color:#778994;margin:8px 0 0}
+.account-message{color:#397b75}
+html[data-theme="dark"] .account-panel{background:#142534;border-color:#263b4b;box-shadow:none}
+html[data-theme="dark"] .account-heading strong,html[data-theme="dark"] .saved-row{color:#dce6ed}
+html[data-theme="dark"] .account-heading small,html[data-theme="dark"] .saved-heading,html[data-theme="dark"] .saved-series p,html[data-theme="dark"] .account-message{color:#9aabb8}
+html[data-theme="dark"] .account-icon{background:#1b3b3a;color:#75c7ba}
+html[data-theme="dark"] .account-button.secondary,html[data-theme="dark"] .auth-mode button,html[data-theme="dark"] .auth-form input{background:#1b3040;border-color:#354b5a;color:#d8e5ed}
+html[data-theme="dark"] .auth-form label{color:#b8c7d0}
+html[data-theme="dark"] .auth-mode button.selected{background:#1b3b3a;border-color:#398b82;color:#a1ddd2}
+html[data-theme="dark"] .saved-series,html[data-theme="dark"] .auth-form{border-color:#2a3d4b}
+@media(max-width:700px){.account-summary{align-items:flex-start;flex-direction:column}.account-actions{width:100%}.auth-form{grid-template-columns:1fr}.auth-mode{grid-column:auto}.auth-form .account-button{width:100%}}
