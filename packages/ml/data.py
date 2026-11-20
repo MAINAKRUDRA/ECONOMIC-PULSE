@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 REQUIRED = ["series_id", "period", "available_at", "revision", "volume_count"]
@@ -52,7 +53,7 @@ def load_vintages(path: str | Path) -> pd.DataFrame:
 
     raw["volume_count"] = pd.to_numeric(raw["volume_count"], errors="raise")
     values = raw["volume_count"].to_numpy(dtype=float)
-    if not (pd.notna(values).all() and (values > 0).all() and __import__("numpy").isfinite(values).all()):
+    if not (pd.notna(values).all() and (values > 0).all() and np.isfinite(values).all()):
         raise ValueError("volume_count must be positive and finite")
 
     if raw.duplicated(["series_id", "period", "available_at", "revision"]).any():
