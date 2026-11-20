@@ -4,6 +4,7 @@ import {
   Tooltip, XAxis, YAxis,
 } from "recharts";
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CircleHelp, Database, Gauge, RefreshCw, ShieldCheck, Moon, Sun } from "lucide-react";
+import AccountPanel from "./components/AccountPanel";
 
 type Observation = { period: string; value: number; unit: string };
 type Forecast = { median: number; lower: number | null; upper: number | null; baseline: number; horizon_end: string; unit: string; mode?: string; interval_status?: string; model_version?: string };
@@ -88,6 +89,7 @@ function App() {
       <main className="main">
         <header className="topbar"><div className="crumb">Intelligence <span>/</span> {active}</div><div className="top-actions"><button className="theme-toggle" onClick={() => setDarkMode((current) => !current)} aria-label={darkMode ? "Switch to light mode" : "Switch to dark mode"} title={darkMode ? "Switch to light mode" : "Switch to dark mode"}>{darkMode ? <Sun size={15} /> : <Moon size={15} />}<span>{darkMode ? "Light mode" : "Dark mode"}</span></button><span className="sample-pill"><span /> {source === "research" ? "PUBLISHED · RESEARCH" : source === "synthetic" ? "API · SYNTHETIC" : "SAMPLE DATA"}</span><button className="refresh" onClick={() => void refresh()}><RefreshCw size={15} /> Refresh</button></div></header>
         <section className="page-heading"><div><div className="eyebrow">ECONOMIC ACTIVITY INTELLIGENCE</div><h1>{active === "Overview" ? "Economic pulse overview" : active}</h1><p>Explore activity signals, trend direction and experimental forecasts.</p></div><div className="date-chip"><Database size={15} /> Data as of {dataAsOf}</div></section>
+        <AccountPanel />
 
         {active === "Overview" || active === "Trends" ? <>
           <div className="notice"><ShieldCheck size={17} /><span><strong>{source === "research" ? "Research publication." : "Demonstration environment."}</strong> {source === "research" ? "Review the model card, source rights and validation evidence before interpreting this forecast." : "All displayed values are synthetic and do not represent official UPI statistics or actual economic activity."}</span></div>
