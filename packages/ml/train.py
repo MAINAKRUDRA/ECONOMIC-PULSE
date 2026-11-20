@@ -9,6 +9,16 @@ from .features import FEATURES,FEATURE_VERSION,build_training_rows,features_asof
 from .backtest import expanding_backtest
 from .challenger import validate_challenger,fit_final_models
 
+
+def _count_from_log(anchor: float, log_change: float) -> float:
+    if not np.isfinite(anchor) or anchor <= 0 or not np.isfinite(log_change):
+        raise ValueError("Forecast anchor and log change must be finite; anchor must be positive")
+    with np.errstate(over="raise", invalid="raise"):
+        value = float(anchor * np.exp(log_change))
+    if not np.isfinite(value) or value <= 0:
+        raise ValueError("Forecast conversion produced a non-finite or non-positive count")
+    return value
+
 def run_training(csv_path:Path,out_dir:Path,series_id:str,source_name:str|None=None,rights_tag:str|None=None):
     raw=load_vintages(csv_path); subset=raw[raw.series_id==series_id]
     if subset.empty: raise ValueError(f"Unknown series_id: {series_id}")
@@ -31,7 +41,7 @@ def run_training(csv_path:Path,out_dir:Path,series_id:str,source_name:str|None=N
     latest=currently_known.period.max(); target=latest+pd.DateOffset(months=1)
     x,anchor,anchor_period=features_asof(subset,origin,target)
     xdf=pd.DataFrame([{k:x[k] for k in FEATURES}],columns=FEATURES)
-    flat=float(anchor); trend=float(anchor*np.exp(x["g1"]*x["h"]))
+    flat=float(anchor); trend=_count_from_log(anchor, x["g1"]*x["h"])
     baseline_scores=backtest.get("metrics",{})
     champion="flat"
     fmae=baseline_scores.get("flat",{}).get("mae")
@@ -45,14 +55,14 @@ def run_training(csv_path:Path,out_dir:Path,series_id:str,source_name:str|None=N
     try:
         if len(eligible)>=30:
             models=fit_final_models(eligible)
-            candidate=float(anchor*np.exp(float(models["point"].predict(xdf)[0])))
+            candidate=_count_from_log(anchor, float(models["point"].predict(xdf)[0]))
             if champion=="xgboost":
                 point=candidate
                 models["point"].save_model(str(out_dir/"champion.ubj"))
             else:
                 point=flat if champion=="flat" else trend
                 models["point"].save_model(str(out_dir/"challenger.ubj"))
-            qraw=[float(anchor*np.exp(float(models[k].predict(xdf)[0]))) for k in ("q10","q50","q90")]
+            qraw=[_count_from_log(anchor, float(models[k].predict(xdf)[0])) for k in ("q10","q50","q90")]
             qsorted=sorted(qraw)
             if champion=="xgboost" and challenger.get("interval",{}).get("calibration_adequate"):
                 lower,median_q,upper=qsorted
