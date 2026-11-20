@@ -46,8 +46,9 @@ def run_training(csv_path:Path,out_dir:Path,series_id:str):
                 models["point"].save_model(str(out_dir/"challenger.ubj"))
             qraw=[float(anchor*np.exp(float(models[k].predict(xdf)[0]))) for k in ("q10","q50","q90")]
             qsorted=sorted(qraw)
-            if challenger.get("interval",{}).get("calibration_adequate"):
-                lower,_,upper=qsorted
+            if champion=="xgboost" and challenger.get("interval",{}).get("calibration_adequate"):
+                lower,median_q,upper=qsorted
+                point=median_q
                 interval_level=0.80; interval_status="validated_on_expanding_validation"
             for key in ("q10","q50","q90"):
                 models[key].save_model(str(out_dir/f"{key}.ubj"))
