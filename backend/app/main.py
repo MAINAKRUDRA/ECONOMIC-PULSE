@@ -6,10 +6,26 @@ from pathlib import Path
 from fastapi import FastAPI,HTTPException,Query
 from fastapi.middleware.cors import CORSMiddleware
 
-app=FastAPI(title="Economic Pulse API",version="0.2.0",
+app=FastAPI(title="Economic Pulse API",version="0.2.1",
     description="Read-only API for published economic activity observations and forecasts.")
-app.add_middleware(CORSMiddleware,allow_origins=["http://localhost:5173"],
-    allow_credentials=False,allow_methods=["GET"],allow_headers=["*"])
+
+# Render production origins are configured with CORS_ORIGINS as a comma-separated
+# environment variable. Local Vite development remains supported by default.
+cors_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ORIGINS",
+        "http://localhost:5173,http://127.0.0.1:5173",
+    ).split(",")
+    if origin.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
 
 DATA_AS_OF=date(2026,10,1)
 BATCH_ID="demo_v1"
