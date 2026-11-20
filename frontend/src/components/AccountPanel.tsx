@@ -51,6 +51,7 @@ export default function AccountPanel() {
   const [saved, setSaved] = useState<SavedSeries[]>([]);
   const [profile, setProfile] = useState<Profile>(emptyProfile());
   const [evidence, setEvidence] = useState<EvidenceFile[]>([]);
+  const [evidenceCategory, setEvidenceCategory] = useState("general");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [signupName, setSignupName] = useState("");
@@ -216,7 +217,7 @@ export default function AccountPanel() {
       storage_path: storagePath,
       mime_type: file.type || null,
       size_bytes: file.size,
-      category: "general",
+      category: evidenceCategory,
     });
     if (rowError) {
       await supabase.storage.from("evidence-vault").remove([storagePath]);
@@ -254,7 +255,7 @@ export default function AccountPanel() {
     }
   }
 
-  const update = (key: keyof Profile, value: string) => setProfile((current) => ({ ...current, [key]: value }));
+  const update = (key: keyof Profile, value: string) => setProfile((current) => ({ ...current, [key]: value }) as Profile);
 
   return (
     <section className="account-panel">
@@ -304,10 +305,10 @@ export default function AccountPanel() {
         <div className="evidence-vault">
           <div className="vault-header">
             <div><div className="vault-section-heading"><FileText size={15} /><strong>Evidence Vault</strong><span className="vault-count">{evidence.length}</span></div><p>Private documents linked to your account. Only you can access these files.</p></div>
-            <label className="account-button upload-button"><Upload size={14} /> {uploading ? "Uploading…" : "Upload evidence"}<input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.webp" onChange={(event) => void uploadEvidence(event)} disabled={uploading} /></label>
+            <div className="vault-upload-controls"><select aria-label="Evidence category" value={evidenceCategory} onChange={(event) => setEvidenceCategory(event.target.value)} disabled={uploading}><option value="general">General</option><option value="financial">Financial</option><option value="legal">Legal</option><option value="compliance">Compliance</option><option value="operational">Operational</option><option value="research">Research</option></select><label className="account-button upload-button"><Upload size={14} /> {uploading ? "Uploading…" : "Upload evidence"}<input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.jpg,.jpeg,.png,.webp" onChange={(event) => void uploadEvidence(event)} disabled={uploading} /></label></div>
           </div>
           <p className="vault-hint">PDF, Office documents, CSV, TXT and images · Maximum 20 MB per file</p>
-          {evidence.length ? <div className="evidence-list">{evidence.map((item) => <div className="evidence-row" key={item.id}><span className="evidence-file-icon"><FileText size={15} /></span><div className="evidence-file-info"><strong>{item.file_name}</strong><small>{formatBytes(item.size_bytes)} · {new Date(item.created_at).toLocaleDateString()}</small></div><div className="evidence-actions"><button title="Download securely" aria-label={`Download ${item.file_name}`} onClick={() => void downloadEvidence(item)}><Download size={14} /></button><button title="Delete file" aria-label={`Delete ${item.file_name}`} onClick={() => void deleteEvidence(item)} disabled={busy}><Trash2 size={14} /></button></div></div>)}</div> : <div className="vault-empty">No evidence uploaded yet. Add documents, reports or supporting files to your private vault.</div>}
+          {evidence.length ? <div className="evidence-list">{evidence.map((item) => <div className="evidence-row" key={item.id}><span className="evidence-file-icon"><FileText size={15} /></span><div className="evidence-file-info"><strong>{item.file_name}</strong><small>{item.category} · {formatBytes(item.size_bytes)} · {new Date(item.created_at).toLocaleDateString()}</small></div><div className="evidence-actions"><button title="Download securely" aria-label={`Download ${item.file_name}`} onClick={() => void downloadEvidence(item)}><Download size={14} /></button><button title="Delete file" aria-label={`Delete ${item.file_name}`} onClick={() => void deleteEvidence(item)} disabled={busy}><Trash2 size={14} /></button></div></div>)}</div> : <div className="vault-empty">No evidence uploaded yet. Add documents, reports or supporting files to your private vault.</div>}
         </div>
 
         <div className="saved-series">
