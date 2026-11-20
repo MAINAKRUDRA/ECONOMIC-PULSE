@@ -104,3 +104,8 @@ html[data-theme="dark"] .evidence-row{border-color:#263947}
 html[data-theme="dark"] .evidence-file-icon{background:#1b3b3a;color:#75c7ba}
 html[data-theme="dark"] .evidence-actions button{color:#a7b8c3}
 @media(max-width:700px){.profile-grid{grid-template-columns:1fr}.profile-grid .field-wide{grid-column:auto}.vault-header{align-items:flex-start;flex-direction:column}.upload-button{width:100%}}
+
+.vault-upload-controls{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.vault-upload-controls>select{border:1px solid #dce5e9;background:#fff;color:#536775;border-radius:7px;padding:8px 9px;font:600 9px 'DM Sans'}
+html[data-theme="dark"] .vault-upload-controls>select{background:#1b3040;border-color:#354b5a;color:#d8e5ed}
+@media(max-width:700px){.vault-upload-controls{width:100%}.vault-upload-controls>select,.vault-upload-controls .upload-button{flex:1;min-width:0}}
