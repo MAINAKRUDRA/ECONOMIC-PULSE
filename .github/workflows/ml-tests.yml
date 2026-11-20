@@ -1,0 +1,27 @@
+name: ML pipeline tests
+on:
+  push:
+    paths:
+      - "packages/ml/**"
+      - "tests/**"
+      - "requirements-training.txt"
+      - ".github/workflows/ml-tests.yml"
+  pull_request:
+    paths:
+      - "packages/ml/**"
+      - "tests/**"
+      - "requirements-training.txt"
+      - ".github/workflows/ml-tests.yml"
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-training.txt
+      - run: python -m pip install -r requirements-training.txt
+      - run: python -m pytest -q
