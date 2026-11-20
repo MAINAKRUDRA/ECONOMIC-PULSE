@@ -1,0 +1,29 @@
+# Render Blueprint: deploy the API and dashboard as separate services.
+# After merging this file, create a Blueprint from the repository in Render.
+services:
+  - type: web
+    name: economic-pulse-api
+    runtime: python
+    plan: free
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health/live
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: CORS_ORIGINS
+        value: https://economic-pulse-frontend.onrender.com,http://localhost:5173
+
+  - type: web
+    name: economic-pulse-frontend
+    runtime: static
+    plan: free
+    region: singapore
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    staticPublishPath: ./dist
+    envVars:
+      - key: VITE_API_BASE_URL
+        value: https://economic-pulse-api.onrender.com
