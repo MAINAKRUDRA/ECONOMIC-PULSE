@@ -19,6 +19,8 @@ def run_training(csv_path:Path,out_dir:Path,series_id:str,source_name:str|None=N
     rows=build_training_rows(raw,series_id)
     if rows.empty: raise ValueError("No eligible training rows; need at least 13 as-of monthly observations")
     out_dir.mkdir(parents=True,exist_ok=True)
+    for stale_model in out_dir.glob("*.ubj"):
+        stale_model.unlink()
     backtest=expanding_backtest(rows)
     challenger=validate_challenger(rows)
     (out_dir/"backtest.json").write_text(json.dumps(backtest,indent=2,allow_nan=False))
