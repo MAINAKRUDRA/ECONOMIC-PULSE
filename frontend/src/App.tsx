@@ -10,7 +10,7 @@ type Observation = { period: string; value: number; unit: string };
 type Forecast = { median: number; lower: number | null; upper: number | null; baseline: number; horizon_end: string; unit: string; mode?: string; interval_status?: string; model_version?: string };
 type ApiEnvelope<T> = { data: T; meta: { mode: string; data_as_of: string; batch_id: string } };
 
-const API = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
+const API = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://127.0.0.1:8000" : "https://economic-pulse-api.onrender.com");
 const sample: Observation[] = [
   { period: "2026-01", value: 82.0, unit: "synthetic index" },
   { period: "2026-02", value: 84.5, unit: "synthetic index" },
