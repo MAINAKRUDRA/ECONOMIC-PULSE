@@ -1,0 +1,53 @@
+# Supabase setup — Economic Pulse
+
+Supabase provides **user authentication and user-owned application data**. FastAPI remains the source for published observations, forecast batches, model cards and pulse calculations.
+
+## 1. Apply the database migration
+
+In the Supabase project dashboard:
+
+1. Open **SQL Editor**.
+2. Create a new query.
+3. Paste and run `supabase/migrations/20261121000000_initial_user_data.sql`.
+4. Open **Table Editor** and confirm `profiles` and `saved_series` exist.
+5. In **Authentication → Providers**, enable Email. Decide whether email confirmation should be required before launch.
+
+The migration enables RLS on both tables. Each signed-in user can only read or modify rows where their user ID matches `auth.uid()`. Never disable RLS to make the frontend work.
+
+## 2. Configure the frontend
+
+Set these variables in the frontend hosting service (Render Static Site → Environment):
+
+- `VITE_SUPABASE_URL` — Supabase project URL.
+- `VITE_SUPABASE_PUBLISHABLE_KEY` — Supabase publishable key.
+
+The publishable key is designed for browser use; RLS is the security boundary. **Never put a Supabase secret or service-role key in a `VITE_*` variable or frontend code.**
+
+For local development, copy `frontend/.env.example` to `frontend/.env.local` and fill in the same two values. Restart Vite after changing environment variables.
+
+## 3. Configure authentication URLs
+
+In Supabase **Authentication → URL Configuration**:
+
+- Set the Site URL to the deployed frontend URL.
+- Add the deployed frontend URL and local development URL (for example `http://localhost:5173`) to the Redirect URLs allow-list.
+
+The current MVP uses email/password sign-up and sign-in; it does not implement OAuth or password-reset UI.
+
+## 4. Verify the integration
+
+1. Open the frontend and select **Sign in / Create account**.
+2. Create a test account using an email address you control.
+3. Confirm the email if confirmation is enabled.
+4. Sign in and select **Save demo series**.
+5. Confirm the row appears under `saved_series` in Table Editor.
+6. Sign out and sign in again; the saved series should remain.
+7. In Table Editor, verify another user cannot read the first user's row (RLS is enforced on API requests).
+
+## Data boundaries
+
+- Supabase: identities, profiles and per-user saved-series/watchlist records.
+- FastAPI: read-only economic observations, forecasts, model cards and pulse endpoints.
+- ML workflow: offline training, backtesting and validated publication bundles.
+
+The current saved-series button saves the existing illustrative `demo_upi` series. It does not convert synthetic demo observations into official economic data.
