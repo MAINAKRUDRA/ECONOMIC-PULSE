@@ -3,7 +3,7 @@ import pytest
 from packages.ml.synthetic import make_synthetic
 from packages.ml.data import load_vintages
 from packages.ml.features import FEATURES,build_training_rows,features_asof
-from packages.ml.publish_bundle import validate_bundle
+from packages.ml.publish_bundle import validate_bundle,publish_local_bundle
 from packages.ml.train import run_training
 def test_synthetic_pipeline_and_bundle(tmp_path):
     csv=make_synthetic(tmp_path/"monthly.csv",months=60); raw=load_vintages(csv)
@@ -13,6 +13,9 @@ def test_synthetic_pipeline_and_bundle(tmp_path):
     assert result["forecast"]["mode"]=="synthetic"
     assert result["forecast"]["lower"] is None
     assert validate_bundle(tmp_path/"bundle")["valid"]
+    destination=tmp_path/"published"/"current.json"
+    publication=publish_local_bundle(tmp_path/"bundle",destination)
+    assert publication["published"] and destination.is_file()
 def test_future_revision_does_not_change_old_origin_features(tmp_path):
     csv=make_synthetic(tmp_path/"monthly.csv",months=48); raw=load_vintages(csv)
     target=pd.Timestamp("2022-01-01",tz="UTC"); origin=pd.Timestamp("2021-12-20",tz="UTC")
