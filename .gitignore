@@ -221,3 +221,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local datasets, research bundles and model artifacts
+/data/raw/
+/data/synthetic/
+/artifacts/
+*.ubj
