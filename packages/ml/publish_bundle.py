@@ -10,6 +10,13 @@ def validate_bundle(directory:Path):
     if not isinstance(rows,list) or not rows: raise ValueError("forecast_rows must be a non-empty list")
     if m.get("feature_version")!=f.get("feature_version"): raise ValueError("Feature version mismatch")
     if m.get("mode") not in {"synthetic","research"}: raise ValueError("Invalid mode")
+    if m.get("mode")=="research" and (not m.get("source_name") or not m.get("rights_tag")):
+        raise ValueError("Research bundle lacks source provenance or rights tag")
+    for name,digest in m.get("model_artifacts",{}).items():
+        artifact=directory/name
+        if not artifact.is_file(): raise ValueError(f"Missing model artifact: {name}")
+        actual=hashlib.sha256(artifact.read_bytes()).hexdigest()
+        if actual!=digest: raise ValueError(f"Model artifact hash mismatch: {name}")
     for r in rows:
         for k in ["target","origin","horizon_end","median","unit","model_version","mode"]:
             if k not in r: raise ValueError(f"Missing forecast field: {k}")
