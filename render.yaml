@@ -1,5 +1,5 @@
 # Render Blueprint: deploy the API and dashboard as separate services.
-# After merging this file, create a Blueprint from the repository in Render.
+# Create a Blueprint in Render from this repository after merging this file.
 services:
   - type: web
     name: economic-pulse-api
@@ -19,8 +19,6 @@ services:
   - type: web
     name: economic-pulse-frontend
     runtime: static
-    plan: free
-    region: singapore
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
