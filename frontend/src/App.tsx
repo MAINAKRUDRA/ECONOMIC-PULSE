@@ -6,7 +6,7 @@ import {
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CircleHelp, Database, Gauge, RefreshCw, ShieldCheck } from "lucide-react";
 
 type Observation = { period: string; value: number; unit: string };
-type Forecast = { median: number; lower: number; upper: number; baseline: number; horizon_end: string; unit: string };
+type Forecast = { median: number; lower: number | null; upper: number | null; baseline: number; horizon_end: string; unit: string; mode?: string; interval_status?: string; model_version?: string };
 type ApiEnvelope<T> = { data: T; meta: { mode: string; data_as_of: string; batch_id: string } };
 
 const API = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -30,7 +30,8 @@ const sampleForecast: Forecast = {
 function App() {
   const [observations, setObservations] = useState<Observation[]>(sample);
   const [forecast, setForecast] = useState<Forecast>(sampleForecast);
-  const [source, setSource] = useState<"sample" | "api">("sample");
+  const [source, setSource] = useState<"sample" | "synthetic" | "research">("sample");
+  const [dataAsOf, setDataAsOf] = useState("Oct 01, 2026");
   const [lastUpdated, setLastUpdated] = useState("Bundled demo fixture");
   const [active, setActive] = useState("Overview");
 
@@ -43,17 +44,17 @@ function App() {
       if (!obsRes.ok || !forecastRes.ok) throw new Error("API unavailable");
       const obs = await obsRes.json() as ApiEnvelope<Observation[]>;
       const fc = await forecastRes.json() as ApiEnvelope<Forecast[]>;
-      if (obs.meta.mode !== "synthetic" || fc.meta.mode !== "synthetic") {
-        throw new Error("Unexpected data mode");
-      }
+      if (!["synthetic", "research"].includes(obs.meta.mode) || !["synthetic", "research"].includes(fc.meta.mode)) throw new Error("Unexpected data mode");
       setObservations(obs.data);
       setForecast(fc.data[0]);
-      setSource("api");
+      setSource(fc.meta.mode as "synthetic" | "research");
+      setDataAsOf(obs.meta.data_as_of);
       setLastUpdated(new Date().toLocaleString());
     } catch {
       setObservations(sample);
       setForecast(sampleForecast);
       setSource("sample");
+      setDataAsOf("Oct 01, 2026");
       setLastUpdated("Bundled demo fixture — API unavailable");
     }
   }
@@ -79,20 +80,20 @@ function App() {
       </aside>
 
       <main className="main">
-        <header className="topbar"><div className="crumb">Intelligence <span>/</span> {active}</div><div className="top-actions"><span className="sample-pill"><span /> {source === "api" ? "API · SYNTHETIC" : "SAMPLE DATA"}</span><button className="refresh" onClick={() => void refresh()}><RefreshCw size={15} /> Refresh</button></div></header>
-        <section className="page-heading"><div><div className="eyebrow">ECONOMIC ACTIVITY INTELLIGENCE</div><h1>{active === "Overview" ? "Economic pulse overview" : active}</h1><p>Explore activity signals, trend direction and experimental forecasts.</p></div><div className="date-chip"><Database size={15} /> Data as of Oct 01, 2026</div></section>
+        <header className="topbar"><div className="crumb">Intelligence <span>/</span> {active}</div><div className="top-actions"><span className="sample-pill"><span /> {source === "research" ? "PUBLISHED · RESEARCH" : source === "synthetic" ? "API · SYNTHETIC" : "SAMPLE DATA"}</span><button className="refresh" onClick={() => void refresh()}><RefreshCw size={15} /> Refresh</button></div></header>
+        <section className="page-heading"><div><div className="eyebrow">ECONOMIC ACTIVITY INTELLIGENCE</div><h1>{active === "Overview" ? "Economic pulse overview" : active}</h1><p>Explore activity signals, trend direction and experimental forecasts.</p></div><div className="date-chip"><Database size={15} /> Data as of {dataAsOf}</div></section>
 
         {active === "Overview" || active === "Trends" ? <>
-          <div className="notice"><ShieldCheck size={17} /><span><strong>Demonstration environment.</strong> All displayed values are synthetic and do not represent official UPI statistics or actual economic activity.</span></div>
+          <div className="notice"><ShieldCheck size={17} /><span><strong>{source === "research" ? "Research publication." : "Demonstration environment."}</strong> {source === "research" ? "Review the model card, source rights and validation evidence before interpreting this forecast." : "All displayed values are synthetic and do not represent official UPI statistics or actual economic activity."}</span></div>
           <section className="metric-grid">
-            <Metric title="Latest activity index" value={latest.toFixed(1)} detail="Synthetic index · Sep 2026" icon={<Activity />} />
+            <Metric title="Latest monthly count" value={latest.toLocaleString()} detail={observations[observations.length - 1]?.period ?? "No period"} icon={<Activity />} />
             <Metric title="Period movement" value={`${change >= 0 ? "+" : ""}${change.toFixed(1)}`} detail="Versus previous period" icon={change >= 0 ? <ArrowUpRight /> : <ArrowDownRight />} />
             <Metric title="Next-period forecast" value={forecast.median.toFixed(1)} detail={`Median · ${forecast.horizon_end}`} icon={<BarChart3 />} />
-            <Metric title="Forecast range" value={`${forecast.lower.toFixed(0)}–${forecast.upper.toFixed(0)}`} detail="Illustrative 80% interval" icon={<Gauge />} />
+            <Metric title="Forecast interval" value={forecast.lower != null && forecast.upper != null ? `${forecast.lower.toLocaleString()}–${forecast.upper.toLocaleString()}` : "Withheld"} detail={forecast.interval_status ?? "Not calibrated"} icon={<Gauge />} />
           </section>
-          <section className="panel chart-panel"><div className="panel-head"><div><h2>Activity trend & forecast</h2><p>Monthly synthetic index · observed values and illustrative forecast</p></div><span className="legend"><i /> Observed <i className="legend-forecast" /> Forecast</span></div><div className="chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData} margin={{ top: 12, right: 12, left: -18, bottom: 0 }}><defs><linearGradient id="observedFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1b8b85" stopOpacity={0.2} /><stop offset="100%" stopColor="#1b8b85" stopOpacity={0} /></linearGradient></defs><CartesianGrid stroke="#e9eef2" vertical={false} /><XAxis dataKey="period" tickLine={false} axisLine={false} tick={{ fill: "#83919d", fontSize: 12 }} /><YAxis tickLine={false} axisLine={false} tick={{ fill: "#83919d", fontSize: 12 }} domain={["dataMin - 5", "dataMax + 5"]} /><Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #e5ebef" }} /><Area type="monotone" dataKey="observed" stroke="#16847e" strokeWidth={2.5} fill="url(#observedFill)" connectNulls /><Line type="monotone" dataKey="forecast" stroke="#e19a48" strokeWidth={2.5} strokeDasharray="6 5" dot={{ r: 4 }} connectNulls /></AreaChart></ResponsiveContainer></div></section>
-          <section className="bottom-grid"><div className="panel"><div className="panel-head"><div><h2>Recent observations</h2><p>Sample series · latest periods</p></div></div><div className="table-wrap"><table><thead><tr><th>PERIOD</th><th>VALUE</th><th>DATA TYPE</th></tr></thead><tbody>{observations.slice(-5).reverse().map(o => <tr key={o.period}><td>{o.period}</td><td className="table-value">{o.value.toFixed(1)}</td><td><span className="tag">Synthetic</span></td></tr>)}</tbody></table></div></div><div className="panel forecast-card"><div className="panel-head"><div><h2>Forecast snapshot</h2><p>Next available period</p></div><span className="forecast-icon"><Activity size={18} /></span></div><div className="forecast-number">{forecast.median.toFixed(1)} <small>index</small></div><div className="range-line"><span style={{ left: "10%", width: "80%" }} /></div><div className="range-labels"><span>Lower {forecast.lower.toFixed(1)}</span><span>Upper {forecast.upper.toFixed(1)}</span></div><div className="baseline">Baseline comparison <strong>{forecast.baseline.toFixed(1)}</strong></div><p className="muted-note">Illustrative baseline only. No model accuracy claim is made.</p></div></section>
-        </> : <section className="panel info-panel"><div className="info-icon"><ShieldCheck /></div><h2>{active}</h2><p>{active === "Forecasts" ? "Forecast output is currently an illustrative sample. The next milestone is to add a reproducible offline training and out-of-time evaluation pipeline." : active === "Methodology" ? "The experimental pulse signal will be versioned, documented and accompanied by data coverage and source provenance. It is not an official GDP growth estimate." : "Model evidence will report evaluation windows, baseline comparisons, error metrics, limitations and whether data is synthetic or real. No accuracy claim is currently available."}</p><div className="notice"><ShieldCheck size={17} /> <span>This section is intentionally marked as a prototype. No unsupported economic or predictive claims are displayed.</span></div></section>}
+          <section className="panel chart-panel"><div className="panel-head"><div><h2>Activity trend & forecast</h2><p>Monthly transaction count · published observations and forecast</p></div><span className="legend"><i /> Observed <i className="legend-forecast" /> Forecast</span></div><div className="chart"><ResponsiveContainer width="100%" height="100%"><AreaChart data={chartData} margin={{ top: 12, right: 12, left: -18, bottom: 0 }}><defs><linearGradient id="observedFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1b8b85" stopOpacity={0.2} /><stop offset="100%" stopColor="#1b8b85" stopOpacity={0} /></linearGradient></defs><CartesianGrid stroke="#e9eef2" vertical={false} /><XAxis dataKey="period" tickLine={false} axisLine={false} tick={{ fill: "#83919d", fontSize: 12 }} /><YAxis tickLine={false} axisLine={false} tick={{ fill: "#83919d", fontSize: 12 }} domain={["dataMin - 5", "dataMax + 5"]} /><Tooltip contentStyle={{ borderRadius: 10, border: "1px solid #e5ebef" }} /><Area type="monotone" dataKey="observed" stroke="#16847e" strokeWidth={2.5} fill="url(#observedFill)" connectNulls /><Line type="monotone" dataKey="forecast" stroke="#e19a48" strokeWidth={2.5} strokeDasharray="6 5" dot={{ r: 4 }} connectNulls /></AreaChart></ResponsiveContainer></div></section>
+          <section className="bottom-grid"><div className="panel"><div className="panel-head"><div><h2>Recent observations</h2><p>Sample series · latest periods</p></div></div><div className="table-wrap"><table><thead><tr><th>PERIOD</th><th>VALUE</th><th>DATA TYPE</th></tr></thead><tbody>{observations.slice(-5).reverse().map(o => <tr key={o.period}><td>{o.period}</td><td className="table-value">{o.value.toFixed(1)}</td><td><span className="tag">{source === "research" ? "Research" : "Synthetic"}</span></td></tr>)}</tbody></table></div></div><div className="panel forecast-card"><div className="panel-head"><div><h2>Forecast snapshot</h2><p>Next available period</p></div><span className="forecast-icon"><Activity size={18} /></span></div><div className="forecast-number">{forecast.median.toLocaleString()} <small>transactions</small></div>{forecast.lower != null && forecast.upper != null ? <><div className="range-line"><span style={{ left: "10%", width: "80%" }} /></div><div className="range-labels"><span>Lower {forecast.lower.toLocaleString()}</span><span>Upper {forecast.upper.toLocaleString()}</span></div></> : <p className="muted-note">Prediction interval withheld: calibration evidence did not meet the publication threshold.</p>}<div className="baseline">Baseline comparison <strong>{forecast.baseline.toFixed(1)}</strong></div><p className="muted-note">Model: {forecast.model_version ?? "demo"} · Mode: {source}</p></div></section>
+        </> : <section className="panel info-panel"><div className="info-icon"><ShieldCheck /></div><h2>{active}</h2><p>{active === "Forecasts" ? "Forecasts are produced offline, compared against chronological baselines and published as a validated batch. Prediction intervals are shown only when calibration checks pass." : active === "Methodology" ? "The experimental pulse signal will be versioned, documented and accompanied by data coverage and source provenance. It is not an official GDP growth estimate." : "Model evidence will report evaluation windows, baseline comparisons, error metrics, limitations and whether data is synthetic or real. No accuracy claim is currently available."}</p><div className="notice"><ShieldCheck size={17} /> <span>Published forecasts remain experimental. UPI activity forecasting is not a GDP forecast.</span></div></section>}
 
         <footer><span>ECONOMIC PULSE <b>·</b> COSMO ADVISORY CO.</span><span>Last refreshed: {lastUpdated}</span></footer>
       </main>
