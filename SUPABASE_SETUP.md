@@ -51,28 +51,3 @@ The current MVP uses email/password sign-up and sign-in; it does not implement O
 - ML workflow: offline training, backtesting and validated publication bundles.
 
 The current saved-series button saves the existing illustrative `demo_upi` series. It does not convert synthetic demo observations into official economic data.
-
-
-## 5. Apply the profile and Evidence Vault migration
-
-After the initial user-data migration has been applied, run the second migration:
-
-`supabase/migrations/20261122000000_profiles_business_evidence_vault.sql`
-
-This adds personal profile fields (full name, phone, account type and role), optional business fields, an `evidence_files` metadata table, and a **private** Storage bucket named `evidence-vault`.
-
-The frontend supports personal and business accounts. Business fields are optional unless the user selects Business. The vault accepts PDF, DOC/DOCX, XLS/XLSX, CSV, TXT, JPG, PNG and WEBP files up to 20 MB each. Files are uploaded into a folder named with the authenticated user's UUID. Storage policies enforce that folder ownership; metadata rows also have RLS.
-
-Downloads use short-lived signed URLs (60 seconds). The bucket must remain private. Do not make it public or remove the Storage RLS policies.
-
-## 6. Profile and evidence verification
-
-1. Sign in with a test account and complete the personal profile.
-2. Switch Account type to Business, fill in the optional business fields, and save.
-3. Upload one test PDF in the Evidence Vault.
-4. Confirm the file appears in the private `evidence-vault` bucket and its metadata appears in `evidence_files`.
-5. Download it from the UI; the download uses a temporary signed URL.
-6. Sign in as a different test user and confirm the first user's metadata and file cannot be listed or downloaded.
-7. Delete the test file and confirm both the Storage object and metadata row are removed.
-
-Collect only business registration information that is actually needed. Do not upload passwords, API keys, payment-card data, or unnecessary identity documents.
