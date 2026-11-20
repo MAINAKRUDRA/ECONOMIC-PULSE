@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Area, AreaChart, CartesianGrid, Line, ResponsiveContainer,
   Tooltip, XAxis, YAxis,
@@ -101,7 +101,7 @@ function App() {
   );
 }
 
-function Metric({ title, value, detail, icon }: { title: string; value: string; detail: string; icon: React.ReactNode }) {
+function Metric({ title, value, detail, icon }: { title: string; value: string; detail: string; icon: ReactNode }) {
   return <div className="metric-card"><div className="metric-top"><span>{title}</span><span className="metric-icon">{icon}</span></div><div className="metric-value">{value}</div><div className="metric-detail">{detail}</div></div>;
 }
 
