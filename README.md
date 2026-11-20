@@ -37,7 +37,9 @@ python -m packages.ml.synthetic --months 60
 python -m packages.ml.train --data data/synthetic/monthly_upi_demo.csv --out artifacts/research --series-id demo_upi_count
 
 # Validate the export contract
-python -m packages.ml.publish_bundle artifacts/research
+python -m packages.ml.publish_bundle artifacts/research --publish-to artifacts/published/current.json
+# Point the read-only API at that atomically switched local publication file:
+# ECONOMIC_PULSE_PUBLISHED_FILE=../artifacts/published/current.json uvicorn app.main:app --reload
 
 # Run automated tests
 python -m pytest -q
@@ -88,4 +90,4 @@ npm run dev
 
 API docs: http://127.0.0.1:8000/docs · Frontend: http://localhost:5173
 
-The current dashboard/API still contains synthetic demo fixtures. Connecting the exported research bundle to the API publication-head workflow is a separate integration step; do not copy a model artifact into the serving container.
+The read-only API can serve the validated local publication file through ECONOMIC_PULSE_PUBLISHED_FILE. This local file switch is for the MVP only; hosted multi-user publication should use the specification’s database-backed staged batch and atomic publication-head transaction. Do not copy model artifacts into the serving container.
