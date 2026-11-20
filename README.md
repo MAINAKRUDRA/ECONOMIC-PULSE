@@ -70,7 +70,7 @@ The worked origin policy builds each historical forecast at 00:00 UTC on the 20t
 
 ## Frontend and API
 
-Frontend: React + TypeScript + Vite. API: FastAPI. Hosting target: Cloudflare Pages + Render. Supabase auth/database are later milestones.
+Frontend: React + TypeScript + Vite. API: FastAPI. Hosting target: Cloudflare Pages + Render. Supabase provides email/password authentication and RLS-protected user profiles and saved-series records; see [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for project configuration. FastAPI remains responsible for published economic data and forecasts.
 
 ```bash
 cd backend
