@@ -9,9 +9,13 @@ from .features import FEATURES,FEATURE_VERSION,build_training_rows,features_asof
 from .backtest import expanding_backtest
 from .challenger import validate_challenger,fit_final_models
 
-def run_training(csv_path:Path,out_dir:Path,series_id:str):
+def run_training(csv_path:Path,out_dir:Path,series_id:str,source_name:str|None=None,rights_tag:str|None=None):
     raw=load_vintages(csv_path); subset=raw[raw.series_id==series_id]
     if subset.empty: raise ValueError(f"Unknown series_id: {series_id}")
+    mode="synthetic" if series_id.startswith("demo_") else "research"
+    if mode=="research" and (not source_name or not rights_tag):
+        raise ValueError("Real-data runs require --source-name and --rights-tag provenance")
+
     rows=build_training_rows(raw,series_id)
     if rows.empty: raise ValueError("No eligible training rows; need at least 13 as-of monthly observations")
     out_dir.mkdir(parents=True,exist_ok=True)
@@ -19,8 +23,10 @@ def run_training(csv_path:Path,out_dir:Path,series_id:str):
     challenger=validate_challenger(rows)
     (out_dir/"backtest.json").write_text(json.dumps(backtest,indent=2,allow_nan=False))
     (out_dir/"challenger_validation.json").write_text(json.dumps(challenger,indent=2,allow_nan=False))
-    latest=subset.period.max(); target=latest+pd.DateOffset(months=1)
     origin=pd.Timestamp.now(tz="UTC")
+    currently_known=subset[subset.available_at<=origin]
+    if currently_known.empty: raise ValueError("No observations are available at the current forecast origin")
+    latest=currently_known.period.max(); target=latest+pd.DateOffset(months=1)
     x,anchor,anchor_period=features_asof(subset,origin,target)
     xdf=pd.DataFrame([{k:x[k] for k in FEATURES}],columns=FEATURES)
     flat=float(anchor); trend=float(anchor*np.exp(x["g1"]*x["h"]))
@@ -59,13 +65,16 @@ def run_training(csv_path:Path,out_dir:Path,series_id:str):
     except RuntimeError:
         point=flat if champion=="flat" else trend
         candidate_status="xgboost_not_installed"
-    mode="synthetic" if series_id.startswith("demo_") else "research"
     forecast={"target":series_id,"origin":origin.isoformat(),"horizon_end":target.strftime("%Y-%m"),
       "anchor_period":anchor_period.strftime("%Y-%m"),"anchor_count":float(anchor),"median":float(point),
       "lower":lower,"upper":upper,"unit":"transaction_count","model_version":champion+"-v1",
       "baseline":flat,"mode":mode,"interval_level":interval_level,"interval_status":interval_status,
       "candidate_prediction":candidate,"candidate_status":candidate_status}
+    model_files=[p.name for p in out_dir.glob("*.ubj")]
+    model_hashes={name:sha256_file(out_dir/name) for name in model_files}
     manifest={"created_at":datetime.now(timezone.utc).isoformat(),"series_id":series_id,
+      "source_name":source_name or "synthetic-fixture","rights_tag":rights_tag or "synthetic-only",
+      "unit":"transaction_count","model_artifacts":model_hashes,
       "data_sha256":sha256_file(csv_path),"feature_version":FEATURE_VERSION,"features":FEATURES,
       "python":platform.python_version(),"pandas":pd.__version__,"numpy":np.__version__,
       "training_rows":int(len(rows)),"training_cutoff":origin.isoformat(),"mode":mode,
@@ -106,6 +115,8 @@ def main():
     p.add_argument("--data",required=True,type=Path)
     p.add_argument("--out",default=Path("artifacts/research"),type=Path)
     p.add_argument("--series-id",default="demo_upi_count")
+    p.add_argument("--source-name",default=None,help="Required for non-synthetic data")
+    p.add_argument("--rights-tag",default=None,help="Required for non-synthetic data; e.g. approved-public")
     a=p.parse_args()
-    print(json.dumps(run_training(a.data,a.out,a.series_id),indent=2,allow_nan=False))
+    print(json.dumps(run_training(a.data,a.out,a.series_id,a.source_name,a.rights_tag),indent=2,allow_nan=False))
 if __name__=="__main__": main()
