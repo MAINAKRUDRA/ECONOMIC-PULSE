@@ -67,6 +67,10 @@ def run_training(csv_path:Path,out_dir:Path,series_id:str,source_name:str|None=N
     except RuntimeError:
         point=flat if champion=="flat" else trend
         candidate_status="xgboost_not_installed"
+    observed_snapshot=(currently_known.sort_values(["available_at","revision"])
+        .drop_duplicates("period",keep="last").sort_values("period"))
+    observations=[{"series_id":series_id,"period":r.period.strftime("%Y-%m"),
+        "value":float(r.volume_count),"unit":"transaction_count"} for r in observed_snapshot.itertuples()]
     forecast={"target":series_id,"origin":origin.isoformat(),"horizon_end":target.strftime("%Y-%m"),
       "anchor_period":anchor_period.strftime("%Y-%m"),"anchor_count":float(anchor),"median":float(point),
       "lower":lower,"upper":upper,"unit":"transaction_count","model_version":champion+"-v1",
@@ -85,6 +89,7 @@ def run_training(csv_path:Path,out_dir:Path,series_id:str,source_name:str|None=N
         "UPI activity forecasting does not validate GDP forecasting.",
         "Quantile bounds are withheld unless expanding-validation coverage diagnostics meet minimum checks."]}
     (out_dir/"forecast_rows.json").write_text(json.dumps([forecast],indent=2,allow_nan=False))
+    (out_dir/"observations.json").write_text(json.dumps(observations,indent=2,allow_nan=False))
     (out_dir/"features.json").write_text(json.dumps({"feature_version":FEATURE_VERSION,"features":FEATURES,
       "target":"log(target_count / anchor_count)","origin_policy":"Forecast origin timestamp; use only vintages available at origin"},indent=2))
     (out_dir/"manifest.json").write_text(json.dumps(manifest,indent=2,allow_nan=False))
