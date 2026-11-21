@@ -71,7 +71,7 @@ def process_job(store: SupabaseStore, job: dict) -> None:
         model = store.insert("model_versions", {
             "id": version_id, "user_id": user_id, "dataset_id": dataset_id,
             "training_job_id": job_id, "series_id": dataset["series_id"],
-            "version": version, "status": "published", "is_published": True,
+            "version": version, "status": "candidate", "is_published": False,
             "storage_path": artifact_prefix, "manifest": manifest,
             "metrics": backtest.get("metrics", {}),
             "forecast_payload": forecast_rows, "observations_payload": observations,
@@ -89,6 +89,10 @@ def process_job(store: SupabaseStore, job: dict) -> None:
                 "upper_bound": forecast.get("upper"), "unit": forecast["unit"],
                 "mode": forecast.get("mode", "research"),
             })
+        store.update("model_versions", {"id": f"eq.{model["id"]}"}, {
+            "status": "published", "is_published": True,
+            "published_at": datetime.now(timezone.utc).isoformat(),
+        })
         store.update("datasets", {"id": f"eq.{dataset_id}"}, {"status": "completed"})
         store.update("training_jobs", {"id": f"eq.{job_id}"}, {
             "status": "completed", "completed_at": datetime.now(timezone.utc).isoformat(),
