@@ -6,6 +6,7 @@ import {
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CircleHelp, Database, Gauge, RefreshCw, ShieldCheck, Moon, Sun } from "lucide-react";
 import AccountPanel from "./components/AccountPanel";
 import TrainingPanel from "./components/TrainingPanel";
+import ModelEvidence from "./components/ModelEvidence";
 import { supabase } from "./lib/supabase";
 
 type Observation = { period: string; value: number; unit: string };
@@ -107,7 +108,7 @@ function App() {
         <section className="page-heading"><div><div className="eyebrow">ECONOMIC ACTIVITY INTELLIGENCE</div><h1>{active === "Overview" ? "Economic pulse overview" : active}</h1><p>Explore activity signals, trend direction and experimental forecasts.</p></div><div className="date-chip"><Database size={15} /> Data as of {dataAsOf}</div></section>
         <AccountPanel />
 
-        {active === "Model training" ? <TrainingPanel /> : active === "Overview" || active === "Trends" ? <>
+        {active === "Model training" ? <TrainingPanel /> : active === "Model evidence" ? <ModelEvidence /> : active === "Overview" || active === "Trends" ? <>
           <div className="notice"><ShieldCheck size={17} /><span><strong>{source === "research" ? "Research publication." : "Demonstration environment."}</strong> {source === "research" ? "Review the model card, source rights and validation evidence before interpreting this forecast." : "All displayed values are synthetic and do not represent official UPI statistics or actual economic activity."}</span></div>
           <section className="metric-grid">
             <Metric title="Latest monthly count" value={latest.toLocaleString()} detail={observations[observations.length - 1]?.period ?? "No period"} icon={<Activity />} />
