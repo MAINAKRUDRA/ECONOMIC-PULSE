@@ -45,6 +45,17 @@ class SupabaseStore:
         rows = response.json()
         return rows[0] if rows else {}
 
+    def upsert(self, table: str, payload: dict, on_conflict: str) -> dict:
+        response = self.client.post(
+            f"{self.url}/rest/v1/{table}",
+            params={"on_conflict": on_conflict},
+            json=payload,
+            headers=self.headers({"Prefer": "resolution=merge-duplicates,return=representation"}),
+        )
+        response.raise_for_status()
+        rows = response.json()
+        return rows[0] if rows else {}
+
     def update(self, table: str, filters: dict, payload: dict) -> list[dict]:
         response = self.client.patch(
             f"{self.url}/rest/v1/{table}", params=filters, json=payload,
