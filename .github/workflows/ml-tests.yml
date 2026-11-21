@@ -11,6 +11,8 @@ on:
   pull_request:
     paths:
       - "packages/ml/**"
+      - "backend/**"
+      - "supabase/migrations/**"
       - "tests/**"
       - "requirements-training.txt"
       - ".github/workflows/ml-tests.yml"
