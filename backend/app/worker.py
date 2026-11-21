@@ -54,7 +54,7 @@ def process_job(store: SupabaseStore, job: dict) -> None:
         (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, allow_nan=False), encoding="utf-8")
         forecast_rows = json.loads((output_dir / "forecast_rows.json").read_text(encoding="utf-8"))
         observations = json.loads((output_dir / "observations.json").read_text(encoding="utf-8"))
-        version_id = str(uuid.uuid4())
+        version_id = str(uuid.uuid5(uuid.NAMESPACE_URL, "economic-pulse-training:" + job_id))
         version = f'{manifest.get("selection", "baseline")}-{manifest.get("created_at", "")[:10]}-{version_id[:8]}'
         artifact_prefix = f"{user_id}/{version_id}"
         artifact_files = []
@@ -68,7 +68,7 @@ def process_job(store: SupabaseStore, job: dict) -> None:
         backtest = json.loads((output_dir / "backtest.json").read_text(encoding="utf-8"))
         challenger = json.loads((output_dir / "challenger_validation.json").read_text(encoding="utf-8"))
         evaluation = {"backtest": backtest, "challenger": challenger, "bundle_validation": validation}
-        model = store.insert("model_versions", {
+        model = store.upsert("model_versions", {
             "id": version_id, "user_id": user_id, "dataset_id": dataset_id,
             "training_job_id": job_id, "series_id": dataset["series_id"],
             "version": version, "status": "candidate", "is_published": False,
@@ -76,19 +76,19 @@ def process_job(store: SupabaseStore, job: dict) -> None:
             "metrics": backtest.get("metrics", {}),
             "forecast_payload": forecast_rows, "observations_payload": observations,
             "model_card": (output_dir / "model_card.md").read_text(encoding="utf-8") + "\n\nOfficial source: " + dataset["source_url"],
-        })
-        store.insert("model_evaluations", {
+        }, "id")
+        store.upsert("model_evaluations", {
             "user_id": user_id, "model_version_id": model["id"], "report": evaluation,
-        })
+        }, "user_id,model_version_id")
         for forecast in forecast_rows:
-            store.insert("forecasts", {
+            store.upsert("forecasts", {
                 "user_id": user_id, "model_version_id": model["id"],
                 "series_id": dataset["series_id"], "target": forecast["target"],
                 "origin": forecast["origin"], "horizon_end": forecast["horizon_end"],
                 "median": forecast["median"], "lower_bound": forecast.get("lower"),
                 "upper_bound": forecast.get("upper"), "unit": forecast["unit"],
                 "mode": forecast.get("mode", "research"),
-            })
+            }, "model_version_id,target")
         store.update("model_versions", {"id": f"eq.{model["id"]}"}, {
             "status": "published", "is_published": True,
             "published_at": datetime.now(timezone.utc).isoformat(),
