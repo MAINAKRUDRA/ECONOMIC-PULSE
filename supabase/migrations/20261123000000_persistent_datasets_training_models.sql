@@ -85,6 +85,7 @@ create table if not exists public.forecasts (
 
 create index if not exists datasets_user_created_idx on public.datasets(user_id, created_at desc);
 create index if not exists training_jobs_queue_idx on public.training_jobs(status, created_at) where status = 'queued';
+create unique index if not exists training_jobs_one_active_per_dataset_idx on public.training_jobs(dataset_id) where status in ('queued','running');
 create index if not exists training_jobs_user_created_idx on public.training_jobs(user_id, created_at desc);
 create index if not exists model_versions_user_series_idx on public.model_versions(user_id, series_id, published_at desc);
 create index if not exists forecasts_user_series_idx on public.forecasts(user_id, series_id, published_at desc);
@@ -139,24 +140,62 @@ drop policy if exists "Users read own model artifacts" on storage.objects;
 create policy "Users read own model artifacts" on storage.objects for select to authenticated
 using (bucket_id='model-artifacts' and (storage.foldername(name))[1]=(select auth.uid()::text));
 
--- A worker atomically claims one queued job. Service role only.
+-- Keep update timestamps accurate and recover abandoned worker leases.
+create or replace function public.set_economic_pulse_updated_at()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+begin
+  new.updated_at = now();
+  return new;
+end;
+$$;
+
+drop trigger if exists datasets_updated_at on public.datasets;
+create trigger datasets_updated_at before update on public.datasets
+for each row execute function public.set_economic_pulse_updated_at();
+drop trigger if exists training_jobs_updated_at on public.training_jobs;
+create trigger training_jobs_updated_at before update on public.training_jobs
+for each row execute function public.set_economic_pulse_updated_at();
+
+-- A worker atomically claims one job. Expired leases retry until max_attempts.
 create or replace function public.claim_economic_pulse_training_job()
 returns setof public.training_jobs
-language sql
+language plpgsql
 security definer
 set search_path = public
 as $$
+begin
+  update public.training_jobs
+     set status='failed',
+         error=coalesce(error, 'Worker lease expired after maximum attempts'),
+         completed_at=now(), updated_at=now()
+   where status='running' and updated_at < now() - interval '30 minutes'
+     and attempt_count >= max_attempts;
+
+  update public.datasets d
+     set status='failed', updated_at=now()
+   where d.status='training' and exists (
+     select 1 from public.training_jobs j
+      where j.dataset_id=d.id and j.status='failed'
+        and j.error='Worker lease expired after maximum attempts'
+   );
+
+  return query
   update public.training_jobs
      set status='running', started_at=coalesce(started_at, now()),
          attempt_count=attempt_count+1, updated_at=now()
    where id = (
      select id from public.training_jobs
-      where (status='queued' or (status='running' and updated_at < now() - interval '30 minutes')) and attempt_count < max_attempts
+      where (status='queued' or (status='running' and updated_at < now() - interval '30 minutes'))
+        and attempt_count < max_attempts
       order by created_at
       for update skip locked
       limit 1
    )
   returning *;
+end;
 $$;
 revoke all on function public.claim_economic_pulse_training_job() from public, anon, authenticated;
 grant execute on function public.claim_economic_pulse_training_job() to service_role;
