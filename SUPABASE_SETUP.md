@@ -20,10 +20,12 @@ The migration enables RLS on both tables. Each signed-in user can only read or m
 
 ## 2. Configure the frontend
 
-Set these variables in Cloudflare Pages → Settings → Environment variables:
+For the repository's GitHub Actions deployment workflow, add these as GitHub Actions secrets (`Settings → Secrets and variables → Actions`):
 
 - `VITE_SUPABASE_URL` — Supabase project URL.
 - `VITE_SUPABASE_PUBLISHABLE_KEY` — Supabase publishable key.
+
+If you instead connect Cloudflare Pages directly to GitHub and build there, set the same two values in Cloudflare Pages → Settings → Environment variables. The current workflow reads them from GitHub Actions secrets at build time.
 
 The publishable key is designed for browser use; RLS is the security boundary. **Never put a Supabase secret or service-role key in a `VITE_*` variable or frontend code.**
 
