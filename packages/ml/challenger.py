@@ -106,7 +106,12 @@ def validate_challenger(rows: pd.DataFrame, min_train=30, min_validation=12):
             continue
         try:
             records.extend(_fit_origin(train, test))
-        except (ValueError, RuntimeError, OverflowError, FloatingPointError):
+        except Exception as exc:
+            # Native XGBoost failures use xgboost.core.XGBoostError. Skip only
+            # expected model-fit/numeric failures; surface unrelated defects.
+            is_xgboost_error = exc.__class__.__module__.startswith("xgboost")
+            if not (is_xgboost_error or isinstance(exc, (ValueError, RuntimeError, OverflowError, FloatingPointError))):
+                raise
             skipped_folds += 1
 
     if not records:
@@ -169,7 +174,10 @@ def validate_challenger(rows: pd.DataFrame, min_train=30, min_validation=12):
             continue
         try:
             holdout_records.extend(_fit_origin(train, test))
-        except (ValueError, RuntimeError, OverflowError, FloatingPointError):
+        except Exception as exc:
+            is_xgboost_error = exc.__class__.__module__.startswith("xgboost")
+            if not (is_xgboost_error or isinstance(exc, (ValueError, RuntimeError, OverflowError, FloatingPointError))):
+                raise
             continue
 
     final_test = {
