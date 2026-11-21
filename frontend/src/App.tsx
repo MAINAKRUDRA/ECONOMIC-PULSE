@@ -74,7 +74,44 @@ function App() {
     }
   }
 
-  useEffect(() => { void refresh(); }, []);\n\n  async function startTraining(event: FormEvent<HTMLFormElement>) {\n    event.preventDefault();\n    setTrainingError("");\n    if (!trainingFile) { setTrainingError("Choose your CSV dataset first."); return; }\n    if (!adminToken.trim()) { setTrainingError("Enter the backend admin token. It is not saved by this page."); return; }\n    const body = new FormData();\n    body.append("file", trainingFile);\n    body.append("series_id", seriesId.trim());\n    body.append("source_name", sourceName.trim());\n    body.append("rights_tag", rightsTag.trim());\n    setTrainingBusy(true);\n    try {\n      const response = await fetch(`${API}/v1/admin/train`, { method: "POST", headers: { Authorization: `Bearer ${adminToken.trim()}` }, body });\n      const payload = await response.json();\n      if (!response.ok) throw new Error(payload.detail || "Training request failed.");\n      setTrainingJob(payload);\n    } catch (error) { setTrainingError(error instanceof Error ? error.message : "Could not start training."); }\n    finally { setTrainingBusy(false); }\n  }\n\n  useEffect(() => {\n    const jobId = trainingJob?.job_id;\n    if (typeof jobId !== "string") return;\n    let cancelled = false;\n    const poll = async () => {\n      try {\n        const response = await fetch(`${API}/v1/admin/train/${jobId}`, { headers: { Authorization: `Bearer ${adminToken.trim()}` } });\n        const payload = await response.json();\n        if (!response.ok) throw new Error(payload.detail || "Could not retrieve training status.");\n        if (!cancelled) { setTrainingJob(payload); if (payload.status === "completed") void refresh(); }\n      } catch (error) { if (!cancelled) setTrainingError(error instanceof Error ? error.message : "Training status unavailable."); }\n    };\n    void poll();\n    const timer = window.setInterval(() => { void poll(); }, 3000);\n    return () => { cancelled = true; window.clearInterval(timer); };\n  }, [trainingJob?.job_id, adminToken]);
+  useEffect(() => { void refresh(); }, []);
+
+  async function startTraining(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setTrainingError("");
+    if (!trainingFile) { setTrainingError("Choose your CSV dataset first."); return; }
+    if (!adminToken.trim()) { setTrainingError("Enter the backend admin token. It is not saved by this page."); return; }
+    const body = new FormData();
+    body.append("file", trainingFile);
+    body.append("series_id", seriesId.trim());
+    body.append("source_name", sourceName.trim());
+    body.append("rights_tag", rightsTag.trim());
+    setTrainingBusy(true);
+    try {
+      const response = await fetch(`${API}/v1/admin/train`, { method: "POST", headers: { Authorization: `Bearer ${adminToken.trim()}` }, body });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail || "Training request failed.");
+      setTrainingJob(payload);
+    } catch (error) { setTrainingError(error instanceof Error ? error.message : "Could not start training."); }
+    finally { setTrainingBusy(false); }
+  }
+
+  useEffect(() => {
+    const jobId = trainingJob?.job_id;
+    if (typeof jobId !== "string") return;
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const response = await fetch(`${API}/v1/admin/train/${jobId}`, { headers: { Authorization: `Bearer ${adminToken.trim()}` } });
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.detail || "Could not retrieve training status.");
+        if (!cancelled) { setTrainingJob(payload); if (payload.status === "completed") void refresh(); }
+      } catch (error) { if (!cancelled) setTrainingError(error instanceof Error ? error.message : "Training status unavailable."); }
+    };
+    void poll();
+    const timer = window.setInterval(() => { void poll(); }, 3000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [trainingJob?.job_id, adminToken]);
 
   const latest = observations[observations.length - 1]?.value ?? 0;
   const previous = observations[observations.length - 2]?.value ?? latest;
@@ -99,7 +136,21 @@ function App() {
         <section className="page-heading"><div><div className="eyebrow">ECONOMIC ACTIVITY INTELLIGENCE</div><h1>{active === "Overview" ? "Economic pulse overview" : active}</h1><p>Explore activity signals, trend direction and experimental forecasts.</p></div><div className="date-chip"><Database size={15} /> Data as of {dataAsOf}</div></section>
         <AccountPanel />
 
-        {active === "Model training" ? <section className="panel info-panel">\n          <div className="info-icon"><Database /></div><h2>Train a model with your dataset</h2>\n          <p>Upload a monthly observations CSV. The backend validates the vintages, runs chronological backtesting, compares baselines with XGBoost and publishes only a validated research bundle.</p>\n          <form onSubmit={startTraining} style={{ display: "grid", gap: 14, maxWidth: 680, marginTop: 22 }}>\n            <label>Backend admin token<input type="password" autoComplete="off" value={adminToken} onChange={e => setAdminToken(e.target.value)} placeholder="ECONOMIC_PULSE_ADMIN_TOKEN" /></label>\n            <label>Dataset CSV<input type="file" accept=".csv,text/csv" onChange={e => setTrainingFile(e.target.files?.[0] ?? null)} /></label>\n            <label>Series ID<input value={seriesId} onChange={e => setSeriesId(e.target.value)} required /></label>\n            <label>Source name<input value={sourceName} onChange={e => setSourceName(e.target.value)} required /></label>\n            <label>Data rights tag<input value={rightsTag} onChange={e => setRightsTag(e.target.value)} required /></label>\n            <button className="refresh" type="submit" disabled={trainingBusy}>{trainingBusy ? "Starting training…" : "Start model training"}</button>\n          </form>\n          <p className="muted-note">Required CSV columns: series_id, period, available_at, revision, volume_count. Use genuine publication timestamps; do not invent vintage history. The admin token is held in page memory only and is not written to local storage.</p>\n          {trainingError && <div className="notice" role="alert">{trainingError}</div>}\n          {trainingJob && <div className="panel" style={{ marginTop: 18, padding: 18 }}><h3>Training job</h3><p><strong>Status:</strong> {String(trainingJob.status ?? "submitted")}</p>{trainingJob.job_id && <p><strong>Job ID:</strong> {String(trainingJob.job_id)}</p>}{trainingJob.error && <p role="alert">{String(trainingJob.error)}</p>}{trainingJob.forecast && <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{JSON.stringify(trainingJob.forecast, null, 2)}</pre>}{trainingJob.backtest_status && <p>Backtest: {String(trainingJob.backtest_status)} · Challenger: {String(trainingJob.challenger_status)}</p>}</div>}\n        </section> : active === "Overview" || active === "Trends" ? <>
+        {active === "Model training" ? <section className="panel info-panel">
+          <div className="info-icon"><Database /></div><h2>Train a model with your dataset</h2>
+          <p>Upload a monthly observations CSV. The backend validates the vintages, runs chronological backtesting, compares baselines with XGBoost and publishes only a validated research bundle.</p>
+          <form onSubmit={startTraining} style={{ display: "grid", gap: 14, maxWidth: 680, marginTop: 22 }}>
+            <label>Backend admin token<input type="password" autoComplete="off" value={adminToken} onChange={e => setAdminToken(e.target.value)} placeholder="ECONOMIC_PULSE_ADMIN_TOKEN" /></label>
+            <label>Dataset CSV<input type="file" accept=".csv,text/csv" onChange={e => setTrainingFile(e.target.files?.[0] ?? null)} /></label>
+            <label>Series ID<input value={seriesId} onChange={e => setSeriesId(e.target.value)} required /></label>
+            <label>Source name<input value={sourceName} onChange={e => setSourceName(e.target.value)} required /></label>
+            <label>Data rights tag<input value={rightsTag} onChange={e => setRightsTag(e.target.value)} required /></label>
+            <button className="refresh" type="submit" disabled={trainingBusy}>{trainingBusy ? "Starting training…" : "Start model training"}</button>
+          </form>
+          <p className="muted-note">Required CSV columns: series_id, period, available_at, revision, volume_count. Use genuine publication timestamps; do not invent vintage history. The admin token is held in page memory only and is not written to local storage.</p>
+          {trainingError && <div className="notice" role="alert">{trainingError}</div>}
+          {trainingJob && <div className="panel" style={{ marginTop: 18, padding: 18 }}><h3>Training job</h3><p><strong>Status:</strong> {String(trainingJob.status ?? "submitted")}</p>{trainingJob.job_id && <p><strong>Job ID:</strong> {String(trainingJob.job_id)}</p>}{trainingJob.error && <p role="alert">{String(trainingJob.error)}</p>}{trainingJob.forecast && <pre style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{JSON.stringify(trainingJob.forecast, null, 2)}</pre>}{trainingJob.backtest_status && <p>Backtest: {String(trainingJob.backtest_status)} · Challenger: {String(trainingJob.challenger_status)}</p>}</div>}
+        </section> : active === "Overview" || active === "Trends" ? <>
           <div className="notice"><ShieldCheck size={17} /><span><strong>{source === "research" ? "Research publication." : "Demonstration environment."}</strong> {source === "research" ? "Review the model card, source rights and validation evidence before interpreting this forecast." : "All displayed values are synthetic and do not represent official UPI statistics or actual economic activity."}</span></div>
           <section className="metric-grid">
             <Metric title="Latest monthly count" value={latest.toLocaleString()} detail={observations[observations.length - 1]?.period ?? "No period"} icon={<Activity />} />
