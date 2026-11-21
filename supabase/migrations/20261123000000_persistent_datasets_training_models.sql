@@ -41,7 +41,7 @@ create table if not exists public.model_versions (
   training_job_id uuid not null unique references public.training_jobs(id) on delete restrict,
   series_id text not null,
   version text not null,
-  status text not null check (status in ('published','rejected','failed')),
+  status text not null check (status in ('candidate','published','rejected','failed')),
   is_published boolean not null default false,
   storage_path text not null,
   manifest jsonb not null,
@@ -50,7 +50,7 @@ create table if not exists public.model_versions (
   observations_payload jsonb not null,
   model_card text not null,
   created_at timestamptz not null default now(),
-  published_at timestamptz,
+  published_at timestamptz default now(),
   unique (user_id, series_id, version)
 );
 
