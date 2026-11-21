@@ -161,3 +161,11 @@ def test_training_job_history_is_scoped_to_authenticated_owner(monkeypatch):
     table, params = store.select_calls[0]
     assert table == "training_jobs"
     assert params["user_id"] == "eq." + USER_ID
+
+def test_supabase_migration_declares_private_owner_scoped_buckets():
+    migration = (ROOT / "supabase/migrations/20261123000000_persistent_datasets_training_models.sql").read_text()
+    assert "('economic-datasets','economic-datasets',false" in migration
+    assert "('model-artifacts','model-artifacts',false" in migration
+    assert "Users upload own economic datasets" in migration
+    assert "Users read own model artifacts" in migration
+    assert "storage.foldername(name)" in migration
