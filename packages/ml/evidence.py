@@ -46,6 +46,7 @@ def build_evidence_report(backtest: dict, challenger: dict, manifest: dict) -> d
     """Create transparent evaluation metadata; never synthesize missing metrics."""
     folds = backtest.get("folds") or []
     validation_origins = [str(fold.get("origin")) for fold in folds if fold.get("origin")]
+    validation_targets = [period for fold in folds for period in (fold.get("target_periods") or [])]
     holdout = (challenger.get("final_test") or {})
     holdout_periods = holdout.get("periods") or []
     data_mode = manifest.get("mode", "unknown")
@@ -109,6 +110,7 @@ def build_evidence_report(backtest: dict, challenger: dict, manifest: dict) -> d
             "training_rows": manifest.get("training_rows"),
             "training_cutoff": manifest.get("training_cutoff"),
             "validation_origins": _window(validation_origins),
+            "validation_target_periods": _window(validation_targets),
             "reserved_holdout": {
                 "periods": holdout_periods,
                 "window": _window(holdout_periods),
