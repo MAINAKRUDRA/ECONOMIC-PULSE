@@ -68,7 +68,15 @@ def process_job(store: SupabaseStore, job: dict) -> None:
 
         backtest = json.loads((output_dir / "backtest.json").read_text(encoding="utf-8"))
         challenger = json.loads((output_dir / "challenger_validation.json").read_text(encoding="utf-8"))
-        evaluation = {"backtest": backtest, "challenger": challenger, "bundle_validation": validation}
+        from packages.ml.evidence import build_evidence_report
+        evidence = build_evidence_report(backtest, challenger, manifest)
+        (output_dir / "evidence.json").write_text(json.dumps(evidence, indent=2, allow_nan=False), encoding="utf-8")
+        # Persist the evidence file alongside the other private model artifacts.
+        store.upload("model-artifacts", f"{artifact_prefix}/evidence.json",
+                     (output_dir / "evidence.json").read_bytes(), "application/json")
+        artifact_files.append("evidence.json")
+        evaluation = {"evidence": evidence, "backtest": backtest, "challenger": challenger,
+                      "bundle_validation": validation}
         model = store.upsert("model_versions", {
             "id": version_id, "user_id": user_id, "dataset_id": dataset_id,
             "training_job_id": job_id, "series_id": dataset["series_id"],
