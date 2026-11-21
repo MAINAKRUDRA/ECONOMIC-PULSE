@@ -5,6 +5,7 @@ import {
 } from "recharts";
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CircleHelp, Database, Gauge, RefreshCw, ShieldCheck, Moon, Sun } from "lucide-react";
 import AccountPanel from "./components/AccountPanel";
+import TrainingPanel from "./components/TrainingPanel";
 
 type Observation = { period: string; value: number; unit: string };
 type Forecast = { median: number; lower: number | null; upper: number | null; baseline: number; horizon_end: string; unit: string; mode?: string; interval_status?: string; model_version?: string };
