@@ -39,6 +39,16 @@ export default function TrainingPanel() {
     } catch { /* Keep history empty while the API is unavailable. */ }
   }
 
+  async function loadJobs(token: string) {
+    try {
+      const response = await fetch(API + "/v1/training-jobs", { headers: { Authorization: "Bearer " + token } });
+      if (response.ok) {
+        const rows = await response.json() as Array<{ id: string; status: string; error?: string; result?: Job["result"] }>;
+        if (rows.length) setJob({ ...rows[0], job_id: rows[0].id });
+      }
+    } catch { /* Keep the current job view while the API is unavailable. */ }
+  }
+
   useEffect(() => {
     if (!supabase) return;
     let active = true;
@@ -47,12 +57,12 @@ export default function TrainingPanel() {
       const session = data.session;
       setAccessToken(session?.access_token ?? "");
       setUserId(session?.user.id ?? "");
-      if (session?.access_token) void loadVersions(session.access_token);
+      if (session?.access_token) { void loadVersions(session.access_token); void loadJobs(session.access_token); }
     });
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setAccessToken(session?.access_token ?? "");
       setUserId(session?.user.id ?? "");
-      if (session?.access_token) void loadVersions(session.access_token);
+      if (session?.access_token) { void loadVersions(session.access_token); void loadJobs(session.access_token); }
       else setVersions([]);
     });
     return () => { active = false; listener.subscription.unsubscribe(); };
