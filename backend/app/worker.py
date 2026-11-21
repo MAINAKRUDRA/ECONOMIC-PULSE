@@ -89,7 +89,7 @@ def process_job(store: SupabaseStore, job: dict) -> None:
                 "upper_bound": forecast.get("upper"), "unit": forecast["unit"],
                 "mode": forecast.get("mode", "research"),
             }, "model_version_id,target")
-        store.update("model_versions", {"id": f"eq.{model["id"]}"}, {
+        store.update("model_versions", {"id": f"eq.{model['id']}"}, {
             "status": "published", "is_published": True,
             "published_at": datetime.now(timezone.utc).isoformat(),
         })
