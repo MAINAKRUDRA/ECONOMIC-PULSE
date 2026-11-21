@@ -36,5 +36,5 @@ def test_evidence_report_preserves_real_source_claim_and_missing_holdout():
     assert report["data_classification"] == "real_official_source_claimed"
     assert report["source"]["sha256"] == "abc"
     assert report["publication"]["accuracy_claim"] is None
-    assert any("authenticity" in item for item in report["limitations"])
+    assert any("authenticate" in item for item in report["limitations"])
     assert any("holdout was not evaluated" in item for item in report["limitations"])
