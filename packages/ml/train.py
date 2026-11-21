@@ -59,7 +59,7 @@ def run_training(csv_path:Path,out_dir:Path,series_id:str,source_name:str|None=N
             # Keep the forecast and the serialized champion consistent: the
             # point model remains the production point predictor. Quantile
             # models provide bounds only; they never silently replace it.
-            point=candidate
+            point=candidate if champion=="xgboost" else (flat if champion=="flat" else trend)
             models["point"].save_model(str(out_dir/"champion.ubj" if champion=="xgboost" else out_dir/"challenger.ubj"))
             qraw=[_count_from_log(anchor, float(models[k].predict(xdf)[0])) for k in ("q10","q50","q90")]
             qsorted=sorted(qraw)
