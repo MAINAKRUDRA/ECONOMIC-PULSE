@@ -70,7 +70,7 @@ The worked origin policy builds each historical forecast at 00:00 UTC on the 20t
 
 ## Frontend and API
 
-Frontend: React + TypeScript + Vite. API: FastAPI. Hosting target: Cloudflare Pages + Render. Supabase provides email/password authentication and RLS-protected user profiles and saved-series records; see [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for project configuration. FastAPI remains responsible for published economic data and forecasts.
+Frontend: React + TypeScript + Vite on Cloudflare Pages. API: FastAPI on Render. Supabase provides email/password authentication, owner-scoped datasets, a PostgreSQL training queue, model-version history, evaluations and forecasts. The separate Render worker performs offline training. See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) and [CLOUDFLARE_DEPLOYMENT.md](CLOUDFLARE_DEPLOYMENT.md) for configuration.
 
 ```bash
 cd backend
@@ -91,3 +91,19 @@ npm run dev
 API docs: http://127.0.0.1:8000/docs · Frontend: http://localhost:5173
 
 The read-only API can serve the validated local publication file through ECONOMIC_PULSE_PUBLISHED_FILE. This local file switch is for the MVP only; hosted multi-user publication should use the specification’s database-backed staged batch and atomic publication-head transaction. Do not copy model artifacts into the serving container.
+
+## Official RBI data ingestion
+
+The initial official-data adapter is `packages/ml/ingest_rbi_xlsx.py`. It converts an operator-selected RBI monthly XLSX aggregate into the model's vintage CSV contract and writes a SHA-256 provenance sidecar. It requires the exact worksheet, columns, official RBI download URL and actual release timestamp; it does not infer totals from entity-level rows. See [CLOUDFLARE_DEPLOYMENT.md](CLOUDFLARE_DEPLOYMENT.md) for the source catalogue and deployment setup.
+
+## Cloudflare Pages
+
+The dashboard's Cloudflare Pages build/deploy workflow is [cloudflare-pages.yml](.github/workflows/cloudflare-pages.yml). Configure `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` GitHub Actions secrets before deploying. The FastAPI/ML API remains a separate Python container service; see [CLOUDFLARE_DEPLOYMENT.md](CLOUDFLARE_DEPLOYMENT.md).
+
+## Persistent training pipeline
+
+The signed-in Model Training panel uploads CSV files directly to the private Supabase Storage bucket `economic-datasets`, then registers dataset metadata under the authenticated user's PostgreSQL identity. The API verifies the Supabase access token and dataset ownership before creating a durable `training_jobs` row. A separate Render background worker claims jobs through a Postgres `SKIP LOCKED` function; training no longer runs in FastAPI background tasks or an in-memory dictionary.
+
+Validated bundles are written to the private `model-artifacts` bucket. The model registry stores version history, source provenance, metrics, forecast payloads and evaluation reports. Forecast endpoints return the latest published model for the signed-in user, and the dashboard refreshes when the session changes.
+
+Apply migrations in timestamp order, including `20261123000000_persistent_datasets_training_models.sql`, after the existing profile and Evidence Vault migrations. Configure `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` on the API and worker only. Never expose the service-role key to the browser. The full deployment and verification checklist is in [CLOUDFLARE_DEPLOYMENT.md](CLOUDFLARE_DEPLOYMENT.md).

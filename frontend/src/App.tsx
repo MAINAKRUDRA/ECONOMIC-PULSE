@@ -6,6 +6,8 @@ import {
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CircleHelp, Database, Gauge, RefreshCw, ShieldCheck, Moon, Sun } from "lucide-react";
 import AccountPanel from "./components/AccountPanel";
 import TrainingPanel from "./components/TrainingPanel";
+import ModelEvidence from "./components/ModelEvidence";
+import { supabase } from "./lib/supabase";
 
 type Observation = { period: string; value: number; unit: string };
 type Forecast = { median: number; lower: number | null; upper: number | null; baseline: number; horizon_end: string; unit: string; mode?: string; interval_status?: string; model_version?: string };
@@ -43,11 +45,14 @@ function App() {
     localStorage.setItem("economic-pulse-theme", darkMode ? "dark" : "light");
   }, [darkMode]);
 
-  async function refresh() {
+  async function refresh(sessionToken?: string) {
     try {
+      const { data: sessionData } = sessionToken ? { data: { session: null } } : supabase ? await supabase.auth.getSession() : { data: { session: null } };
+      const token = sessionToken || sessionData.session?.access_token;
+      const headers = token ? { Authorization: "Bearer " + token } : undefined;
       const [obsRes, forecastRes] = await Promise.all([
-        fetch(`${API}/v1/observations?series_id=demo_upi`),
-        fetch(`${API}/v1/forecasts`),
+        fetch(API + "/v1/observations", { headers }),
+        fetch(API + "/v1/forecasts", { headers }),
       ]);
       if (!obsRes.ok || !forecastRes.ok) throw new Error("API unavailable");
       const obs = await obsRes.json() as ApiEnvelope<Observation[]>;
@@ -67,7 +72,18 @@ function App() {
     }
   }
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    void refresh();
+    if (!supabase) return;
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) void refresh(session.access_token);
+      else {
+        setObservations(sample); setForecast(sampleForecast); setSource("sample");
+        setDataAsOf("Oct 01, 2026"); setLastUpdated("Bundled demo fixture");
+      }
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
   const latest = observations[observations.length - 1]?.value ?? 0;
   const previous = observations[observations.length - 2]?.value ?? latest;
@@ -92,7 +108,7 @@ function App() {
         <section className="page-heading"><div><div className="eyebrow">ECONOMIC ACTIVITY INTELLIGENCE</div><h1>{active === "Overview" ? "Economic pulse overview" : active}</h1><p>Explore activity signals, trend direction and experimental forecasts.</p></div><div className="date-chip"><Database size={15} /> Data as of {dataAsOf}</div></section>
         <AccountPanel />
 
-        {active === "Model training" ? <TrainingPanel /> : active === "Overview" || active === "Trends" ? <>
+        {active === "Model training" ? <TrainingPanel /> : active === "Model evidence" ? <ModelEvidence /> : active === "Overview" || active === "Trends" ? <>
           <div className="notice"><ShieldCheck size={17} /><span><strong>{source === "research" ? "Research publication." : "Demonstration environment."}</strong> {source === "research" ? "Review the model card, source rights and validation evidence before interpreting this forecast." : "All displayed values are synthetic and do not represent official UPI statistics or actual economic activity."}</span></div>
           <section className="metric-grid">
             <Metric title="Latest monthly count" value={latest.toLocaleString()} detail={observations[observations.length - 1]?.period ?? "No period"} icon={<Activity />} />

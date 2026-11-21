@@ -14,4 +14,14 @@ def metrics(actual,predicted):
     mask=np.isfinite(actual)&np.isfinite(predicted)
     if not mask.any(): return {"n":0,"mae":None,"rmse":None}
     err=predicted[mask]-actual[mask]
-    return {"n":int(mask.sum()),"mae":float(np.mean(np.abs(err))),"rmse":float(np.sqrt(np.mean(err**2)))}
+    actual_values = actual[mask]
+    predicted_values = predicted[mask]
+    denominator = np.abs(actual_values) + np.abs(predicted_values)
+    smape_mask = denominator > 0
+    return {
+        "n": int(mask.sum()),
+        "mae": float(np.mean(np.abs(err))),
+        "rmse": float(np.sqrt(np.mean(err**2))),
+        "mape_pct": float(np.mean(np.abs(err) / np.abs(actual_values)) * 100) if np.all(actual_values != 0) else None,
+        "smape_pct": float(np.mean(200 * np.abs(err[smape_mask]) / denominator[smape_mask])) if smape_mask.any() else None,
+    }

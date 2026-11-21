@@ -34,8 +34,8 @@ def expanding_backtest(rows,min_train=18,final_test_months=12):
         if len(train)<min_train or test.empty: continue
         pred=predict_baselines(train,test); actual=test.target_count.to_numpy(dtype=float)
         raw_folds.append((actual,pred))
-        folds.append({"origin":pd.Timestamp(origin).isoformat(),"n_train":int(len(train)),
-          "n_test":int(len(test)),"actual":actual.tolist(),
+        folds.append({"origin":pd.Timestamp(origin).isoformat(),"target_periods":[pd.Timestamp(x).strftime("%Y-%m") for x in test.target_period],
+          "n_train":int(len(train)),"n_test":int(len(test)),"actual":actual.tolist(),
           "predictions":{k:[float(x) if np.isfinite(x) else None for x in v] for k,v in pred.items()}})
     summary={}
     for name in ["flat","trend","seasonal"]:
