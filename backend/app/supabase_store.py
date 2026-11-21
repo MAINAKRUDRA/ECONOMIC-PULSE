@@ -69,7 +69,7 @@ class SupabaseStore:
         response = self.client.post(
             f"{self.url}/storage/v1/object/{bucket}/{encoded}",
             content=content,
-            headers=self.headers({"Content-Type": content_type, "x-upsert": "false"}),
+            headers=self.headers({"Content-Type": content_type, "x-upsert": "true"}),
         )
         response.raise_for_status()
 
