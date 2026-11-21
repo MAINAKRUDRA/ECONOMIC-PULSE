@@ -91,3 +91,11 @@ npm run dev
 API docs: http://127.0.0.1:8000/docs · Frontend: http://localhost:5173
 
 The read-only API can serve the validated local publication file through ECONOMIC_PULSE_PUBLISHED_FILE. This local file switch is for the MVP only; hosted multi-user publication should use the specification’s database-backed staged batch and atomic publication-head transaction. Do not copy model artifacts into the serving container.
+
+## Official RBI data ingestion
+
+The initial official-data adapter is `packages/ml/ingest_rbi_xlsx.py`. It converts an operator-selected RBI monthly XLSX aggregate into the model's vintage CSV contract and writes a SHA-256 provenance sidecar. It requires the exact worksheet, columns, official RBI download URL and actual release timestamp; it does not infer totals from entity-level rows. See [CLOUDFLARE_DEPLOYMENT.md](CLOUDFLARE_DEPLOYMENT.md) for the source catalogue and deployment setup.
+
+## Cloudflare Pages
+
+The dashboard's Cloudflare Pages build/deploy workflow is [cloudflare-pages.yml](.github/workflows/cloudflare-pages.yml). Configure `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` GitHub Actions secrets before deploying. The FastAPI/ML API remains a separate Python container service; see [CLOUDFLARE_DEPLOYMENT.md](CLOUDFLARE_DEPLOYMENT.md).
