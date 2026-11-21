@@ -38,6 +38,8 @@ def process_job(store: SupabaseStore, job: dict) -> None:
         csv_path.write_bytes(store.download("economic-datasets", dataset["storage_path"]))
         output_dir = root / "bundle"
 
+        from app.source_policy import validate_official_source_url
+        source_url = validate_official_source_url(dataset["source_url"])
         from packages.ml.train import run_training
         from packages.ml.publish_bundle import validate_bundle
 
@@ -48,8 +50,7 @@ def process_job(store: SupabaseStore, job: dict) -> None:
             raise ValueError("Model bundle did not pass publication validation")
 
         manifest = result["manifest"]
-        from app.source_policy import validate_official_source_url
-        manifest["source_url"] = validate_official_source_url(dataset["source_url"])
+        manifest["source_url"] = source_url
         manifest["dataset_id"] = dataset_id
         (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, allow_nan=False), encoding="utf-8")
         forecast_rows = json.loads((output_dir / "forecast_rows.json").read_text(encoding="utf-8"))
