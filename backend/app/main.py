@@ -115,6 +115,11 @@ def create_training_job(payload: TrainingRequest, authorization: str | None = He
         dataset = dataset_rows[0]
         if not dataset["storage_path"].startswith(user["id"] + "/"):
             raise HTTPException(status_code=403, detail="Dataset storage ownership mismatch")
+        from app.source_policy import validate_official_source_url
+        try:
+            validate_official_source_url(dataset.get("source_url", ""))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         if dataset["status"] in {"queued", "training"}:
             raise HTTPException(status_code=409, detail="Dataset already has an active training run")
         job = store.insert("training_jobs", {
