@@ -56,8 +56,11 @@ def load_vintages(path: str | Path) -> pd.DataFrame:
     if not (pd.notna(values).all() and (values > 0).all() and np.isfinite(values).all()):
         raise ValueError("volume_count must be positive and finite")
 
-    if raw.duplicated(["series_id", "period", "available_at", "revision"]).any():
-        raise ValueError("Duplicate vintage")
+    # A revision number identifies one release for a given series and period.
+    # Allowing the same revision number at multiple timestamps makes the
+    # as-of snapshot ambiguous and can silently select inconsistent values.
+    if raw.duplicated(["series_id", "period", "revision"]).any():
+        raise ValueError("Duplicate revision for series_id/period")
 
     return raw.sort_values(
         ["series_id", "period", "available_at", "revision"]
