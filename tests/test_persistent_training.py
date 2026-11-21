@@ -143,3 +143,10 @@ def test_worker_persists_artifacts_evaluation_forecasts_and_model_version(tmp_pa
                for table, _, payload in store.updates)
     assert any(table == "training_jobs" and payload.get("status") == "completed"
                for table, _, payload in store.updates)
+
+def test_training_status_query_is_scoped_to_authenticated_owner(monkeypatch):
+    store = FakeStore()
+    monkeypatch.setattr(main, "_store", lambda: store)
+    with pytest.raises(HTTPException) as error:
+        main.get_training_job(JOB_ID, "Bearer valid-session")
+    assert error.value.status_code == 404
