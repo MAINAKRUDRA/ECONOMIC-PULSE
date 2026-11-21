@@ -44,7 +44,10 @@ export default function TrainingPanel() {
       const response = await fetch(API + "/v1/training-jobs", { headers: { Authorization: "Bearer " + token } });
       if (response.ok) {
         const rows = await response.json() as Array<{ id: string; status: string; error?: string; result?: Job["result"] }>;
-        if (rows.length) setJob({ ...rows[0], job_id: rows[0].id });
+        if (rows.length) {
+          const active = rows.find(row => ["queued", "running"].includes(row.status)) || rows[0];
+          setJob({ ...active, job_id: active.id });
+        }
       }
     } catch { /* Keep the current job view while the API is unavailable. */ }
   }
