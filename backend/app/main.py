@@ -107,7 +107,7 @@ def create_training_job(payload: TrainingRequest, authorization: str | None = He
     try:
         user = _current_user(store, authorization)
         dataset_rows = store.select("datasets", {
-            "select": "id,user_id,storage_path,status", "id": f"eq.{payload.dataset_id}",
+            "select": "id,user_id,storage_path,status,source_url", "id": f"eq.{payload.dataset_id}",
             "user_id": f"eq.{user['id']}", "limit": "1",
         })
         if not dataset_rows:
