@@ -4,12 +4,18 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 import tempfile
 import time
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 
-from supabase_store import SupabaseStore
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from app.supabase_store import SupabaseStore
 
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"))
 log = logging.getLogger("economic-pulse-worker")
@@ -17,9 +23,7 @@ POLL_SECONDS = float(os.getenv("WORKER_POLL_SECONDS", "5"))
 
 
 def process_job(store: SupabaseStore, job: dict) -> None:
-    job_id = job["id"]
-    dataset_id = job["dataset_id"]
-    user_id = job["user_id"]
+    job_id, dataset_id, user_id = job["id"], job["dataset_id"], job["user_id"]
     dataset_rows = store.select("datasets", {
         "select": "*", "id": f"eq.{dataset_id}", "user_id": f"eq.{user_id}", "limit": "1"
     })
@@ -37,10 +41,8 @@ def process_job(store: SupabaseStore, job: dict) -> None:
         from packages.ml.train import run_training
         from packages.ml.publish_bundle import validate_bundle
 
-        result = run_training(
-            csv_path, output_dir, dataset["series_id"],
-            dataset["source_name"], dataset["rights_tag"],
-        )
+        result = run_training(csv_path, output_dir, dataset["series_id"],
+                              dataset["source_name"], dataset["rights_tag"])
         validation = validate_bundle(output_dir)
         if not validation.get("valid"):
             raise ValueError("Model bundle did not pass publication validation")
@@ -55,7 +57,8 @@ def process_job(store: SupabaseStore, job: dict) -> None:
         for artifact in sorted(output_dir.iterdir()):
             if artifact.is_file():
                 content_type = "application/json" if artifact.suffix == ".json" else "text/plain" if artifact.suffix == ".md" else "application/octet-stream"
-                store.upload("model-artifacts", f"{artifact_prefix}/{artifact.name}", artifact.read_bytes(), content_type)
+                store.upload("model-artifacts", f"{artifact_prefix}/{artifact.name}",
+                             artifact.read_bytes(), content_type)
                 artifact_files.append(artifact.name)
 
         backtest = json.loads((output_dir / "backtest.json").read_text(encoding="utf-8"))
@@ -69,7 +72,6 @@ def process_job(store: SupabaseStore, job: dict) -> None:
             "metrics": backtest.get("metrics", {}),
             "forecast_payload": forecast_rows, "observations_payload": observations,
             "model_card": (output_dir / "model_card.md").read_text(encoding="utf-8"),
-            "published_at": "now()",
         })
         store.insert("model_evaluations", {
             "user_id": user_id, "model_version_id": model["id"], "report": evaluation,
@@ -85,7 +87,7 @@ def process_job(store: SupabaseStore, job: dict) -> None:
             })
         store.update("datasets", {"id": f"eq.{dataset_id}"}, {"status": "completed"})
         store.update("training_jobs", {"id": f"eq.{job_id}"}, {
-            "status": "completed", "completed_at": "now()",
+            "status": "completed", "completed_at": datetime.now(timezone.utc).isoformat(),
             "result": {"model_version_id": model["id"], "version": version,
                        "forecast": forecast_rows[0], "backtest_status": result["backtest_status"],
                        "challenger_status": result["challenger_status"],
@@ -115,11 +117,10 @@ def main() -> None:
                     log.exception("Training job %s failed", job["id"])
                     attempt = int(job.get("attempt_count", 1))
                     terminal = attempt >= int(job.get("max_attempts", 2))
-                    store.update("training_jobs", {"id": f'eq.{job["id"]}'}, {
-                        "status": "failed" if terminal else "queued",
-                        "error": str(exc)[:1500],
-                        "completed_at": "now()" if terminal else None,
-                    })
+                    update = {"status": "failed" if terminal else "queued", "error": str(exc)[:1500]}
+                    if terminal:
+                        update["completed_at"] = datetime.now(timezone.utc).isoformat()
+                    store.update("training_jobs", {"id": f'eq.{job["id"]}'}, update)
                     store.update("datasets", {"id": f'eq.{job["dataset_id"]}'}, {
                         "status": "failed" if terminal else "queued"
                     })
