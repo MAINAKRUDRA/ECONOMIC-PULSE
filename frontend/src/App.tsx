@@ -44,12 +44,11 @@ function App() {
     localStorage.setItem("economic-pulse-theme", darkMode ? "dark" : "light");
   }, [darkMode]);
 
-  async function refresh() {
+  async function refresh(sessionToken?: string) {
     try {
-      const { data: sessionData } = supabase ? await supabase.auth.getSession() : { data: { session: null } };
-      const headers = sessionData.session?.access_token
-        ? { Authorization: "Bearer " + sessionData.session.access_token }
-        : undefined;
+      const { data: sessionData } = sessionToken ? { data: { session: null } } : supabase ? await supabase.auth.getSession() : { data: { session: null } };
+      const token = sessionToken || sessionData.session?.access_token;
+      const headers = token ? { Authorization: "Bearer " + token } : undefined;
       const [obsRes, forecastRes] = await Promise.all([
         fetch(API + "/v1/observations", { headers }),
         fetch(API + "/v1/forecasts", { headers }),
@@ -76,7 +75,7 @@ function App() {
     void refresh();
     if (!supabase) return;
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session) void refresh();
+      if (session) void refresh(session.access_token);
       else {
         setObservations(sample); setForecast(sampleForecast); setSource("sample");
         setDataAsOf("Oct 01, 2026"); setLastUpdated("Bundled demo fixture");
