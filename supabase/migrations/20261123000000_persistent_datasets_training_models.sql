@@ -59,7 +59,8 @@ create table if not exists public.model_evaluations (
   user_id uuid not null references auth.users(id) on delete cascade,
   model_version_id uuid not null references public.model_versions(id) on delete cascade,
   report jsonb not null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (user_id, model_version_id)
 );
 
 create table if not exists public.forecasts (
@@ -78,7 +79,8 @@ create table if not exists public.forecasts (
   published_at timestamptz not null default now(),
   check (median >= 0),
   check ((lower_bound is null and upper_bound is null) or
-         (lower_bound is not null and upper_bound is not null and 0 <= lower_bound and lower_bound <= median and median <= upper_bound))
+         (lower_bound is not null and upper_bound is not null and 0 <= lower_bound and lower_bound <= median and median <= upper_bound)),
+  unique (model_version_id, target)
 );
 
 create index if not exists datasets_user_created_idx on public.datasets(user_id, created_at desc);
