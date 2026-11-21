@@ -23,6 +23,7 @@ export default function TrainingPanel() {
   const [file, setFile] = useState<File | null>(null);
   const [seriesId, setSeriesId] = useState("upi_monthly");
   const [sourceName, setSourceName] = useState("Reserve Bank of India");
+  const [sourceUrl, setSourceUrl] = useState("https://rbi.org.in/scripts/EntityWiseRetailStatistics.aspx");
   const [rightsTag, setRightsTag] = useState("official-public-data");
   const [job, setJob] = useState<Job | null>(null);
   const [busy, setBusy] = useState(false);
@@ -86,6 +87,12 @@ export default function TrainingPanel() {
     if (!seriesId.trim() || seriesId.startsWith("demo_") || !sourceName.trim() || !rightsTag.trim()) {
       setMessage("Use a real series ID and provide source and rights provenance."); return;
     }
+    const officialDomains = ["rbi.org.in", "npci.org.in", "mospi.gov.in", "data.gov.in", "imf.org", "worldbank.org", "oecd.org", "fred.stlouisfed.org"];
+    let sourceHost = "";
+    try { sourceHost = new URL(sourceUrl).hostname.toLowerCase(); } catch { /* Invalid URL is rejected below. */ }
+    if (!sourceUrl.startsWith("https://") || !officialDomains.some(domain => sourceHost === domain || sourceHost.endsWith("." + domain))) {
+      setMessage("Use an HTTPS URL from an approved official statistics domain."); return;
+    }
     setBusy(true); setMessage(""); setJob(null);
     let storagePath = "";
     try {
@@ -98,7 +105,7 @@ export default function TrainingPanel() {
 
       const { data: dataset, error: rowError } = await supabase.from("datasets").insert({
         user_id: userId, series_id: seriesId.trim(), source_name: sourceName.trim(),
-        rights_tag: rightsTag.trim(), file_name: file.name, storage_path: storagePath,
+        source_url: sourceUrl.trim(), rights_tag: rightsTag.trim(), file_name: file.name, storage_path: storagePath,
         content_type: "text/csv", size_bytes: file.size, status: "uploaded",
       }).select("id").single();
       if (rowError) {
@@ -133,6 +140,7 @@ export default function TrainingPanel() {
       <div className="training-fields">
         <label>Series ID<input required value={seriesId} onChange={e => setSeriesId(e.target.value)} placeholder="upi_monthly" /></label>
         <label>Official source<input required value={sourceName} onChange={e => setSourceName(e.target.value)} placeholder="Reserve Bank of India" /></label>
+        <label>Official source URL<input required type="url" value={sourceUrl} onChange={e => setSourceUrl(e.target.value)} placeholder="https://rbi.org.in/…" /></label>
         <label>Data rights tag<input required value={rightsTag} onChange={e => setRightsTag(e.target.value)} placeholder="official-public-data" /></label>
       </div>
       <div className="training-actions"><button className="account-button" type="submit" disabled={busy || !!running || !accessToken}>{busy ? <Loader2 size={14} className="spin"/> : <UploadCloud size={14}/>} {busy ? "Uploading…" : "Upload and train"}</button><span>Stored in private Supabase Storage; job state is saved in PostgreSQL.</span></div>
