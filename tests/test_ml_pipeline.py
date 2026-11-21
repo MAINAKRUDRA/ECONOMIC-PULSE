@@ -82,8 +82,9 @@ def test_empty_series_id_rejected(tmp_path):
 def test_duplicate_revision_for_period_rejected(tmp_path):
     csv = make_synthetic(tmp_path / "monthly.csv", months=24)
     df = pd.read_csv(csv)
+    df["available_at"] = pd.to_datetime(df["available_at"], utc=True)
     duplicate = df.iloc[[0]].copy()
-    duplicate["available_at"] = pd.to_datetime(duplicate["available_at"]) + pd.Timedelta(days=1)
+    duplicate["available_at"] = duplicate["available_at"] + pd.Timedelta(days=1)
     df = pd.concat([df, duplicate], ignore_index=True)
     df.to_csv(csv, index=False)
     with pytest.raises(ValueError, match="Duplicate revision"):
