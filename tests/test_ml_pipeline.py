@@ -104,3 +104,35 @@ def test_training_falls_back_when_xgboost_native_fit_fails(tmp_path, monkeypatch
     assert result["forecast"]["median"] > 0
     assert result["manifest"]["candidate_status"] == "xgboost_training_failed:RuntimeError"
     assert validate_bundle(tmp_path / "bundle")["valid"]
+
+
+
+def test_failed_promoted_challenger_reverts_to_baseline_champion(tmp_path, monkeypatch):
+    from packages.ml import train as train_module
+
+    csv = make_synthetic(tmp_path / "monthly.csv", months=72)
+
+    monkeypatch.setattr(
+        train_module,
+        "validate_challenger",
+        lambda _rows: {
+            "status": "ok",
+            "n": 20,
+            "promote_xgboost": True,
+            "best_baseline": "trend",
+            "interval": {"calibration_adequate": False},
+        },
+    )
+
+    def fail_fit(_rows):
+        raise RuntimeError("simulated XGBoost native failure")
+
+    monkeypatch.setattr(train_module, "fit_final_models", fail_fit)
+    out = tmp_path / "bundle"
+    result = train_module.run_training(csv, out, "demo_upi_count")
+
+    assert result["forecast"]["model_version"] == "trend-v1"
+    assert result["manifest"]["selection"] == "trend"
+    assert result["manifest"]["candidate_status"] == "xgboost_training_failed:RuntimeError"
+    assert not list(out.glob("*.ubj"))
+    assert validate_bundle(out)["valid"]
