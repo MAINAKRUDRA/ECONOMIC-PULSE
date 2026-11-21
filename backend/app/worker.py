@@ -48,6 +48,10 @@ def process_job(store: SupabaseStore, job: dict) -> None:
             raise ValueError("Model bundle did not pass publication validation")
 
         manifest = result["manifest"]
+        from app.source_policy import validate_official_source_url
+        manifest["source_url"] = validate_official_source_url(dataset["source_url"])
+        manifest["dataset_id"] = dataset_id
+        (output_dir / "manifest.json").write_text(json.dumps(manifest, indent=2, allow_nan=False), encoding="utf-8")
         forecast_rows = json.loads((output_dir / "forecast_rows.json").read_text(encoding="utf-8"))
         observations = json.loads((output_dir / "observations.json").read_text(encoding="utf-8"))
         version_id = str(uuid.uuid4())
@@ -71,7 +75,7 @@ def process_job(store: SupabaseStore, job: dict) -> None:
             "storage_path": artifact_prefix, "manifest": manifest,
             "metrics": backtest.get("metrics", {}),
             "forecast_payload": forecast_rows, "observations_payload": observations,
-            "model_card": (output_dir / "model_card.md").read_text(encoding="utf-8"),
+            "model_card": (output_dir / "model_card.md").read_text(encoding="utf-8") + "\n\nOfficial source: " + dataset["source_url"],
         })
         store.insert("model_evaluations", {
             "user_id": user_id, "model_version_id": model["id"], "report": evaluation,
