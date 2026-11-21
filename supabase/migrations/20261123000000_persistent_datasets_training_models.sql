@@ -104,9 +104,8 @@ create policy "Owners delete their datasets" on public.datasets for delete to au
 
 drop policy if exists "Owners read their training jobs" on public.training_jobs;
 create policy "Owners read their training jobs" on public.training_jobs for select to authenticated using (auth.uid() = user_id);
+-- Only the verified API service role may enqueue jobs. Users can read only their own jobs.
 drop policy if exists "Owners enqueue their training jobs" on public.training_jobs;
-create policy "Owners enqueue their training jobs" on public.training_jobs for insert to authenticated
-with check (auth.uid() = user_id and exists (select 1 from public.datasets d where d.id = dataset_id and d.user_id = auth.uid()));
 
 drop policy if exists "Owners read their model versions" on public.model_versions;
 create policy "Owners read their model versions" on public.model_versions for select to authenticated using (auth.uid() = user_id);
