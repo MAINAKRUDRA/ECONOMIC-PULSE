@@ -12,6 +12,7 @@ type Evidence = {
   sample?: {
     training_rows?: number; training_cutoff?: string;
     validation_origins?: { start?: string | null; end?: string | null; observations?: number };
+    validation_target_periods?: { start?: string | null; end?: string | null; observations?: number };
     reserved_holdout?: { window?: { start?: string | null; end?: string | null }; periods?: string[]; evaluated?: boolean; n?: number };
   };
   metrics?: {
@@ -109,7 +110,7 @@ export default function ModelEvidence() {
         <h3>Reserved final holdout</h3>
         <p className="muted-note">{evidence.sample?.reserved_holdout?.window?.start || "No holdout window"} to {evidence.sample?.reserved_holdout?.window?.end || "not recorded"} · {evidence.sample?.reserved_holdout?.evaluated ? "Evaluated after model selection" : "No evaluated holdout metrics"}</p>
         <MetricTable metrics={{ xgboost: evidence.metrics?.reserved_holdout?.xgboost, ...(evidence.metrics?.reserved_holdout?.baselines || {}) }} />
-        <h3>Limitations</h3>
+        <h3>Prediction interval diagnostics</h3>\n        <p className="muted-note">Nominal level: {evidence.interval_diagnostics?.nominal_level == null ? "Not available" : (evidence.interval_diagnostics.nominal_level * 100) + "%"} · Empirical coverage: {evidence.interval_diagnostics?.empirical_coverage == null ? "Not available" : (evidence.interval_diagnostics.empirical_coverage * 100).toFixed(1) + "%"} · Calibration: {evidence.interval_diagnostics?.calibration_adequate ? "Adequate by configured threshold" : "Not adequate / not established"}</p>\n        <h3>Limitations</h3>
         <ul>{(evidence.limitations || []).map((item, index) => <li key={index}>{item}</li>)}</ul>
         <p className="muted-note"><strong>Scope:</strong> {evidence.series?.forecast_scope || "UPI activity is not a GDP forecast."}</p>
       </>}
