@@ -109,3 +109,26 @@ html[data-theme="dark"] .evidence-actions button{color:#a7b8c3}
 .vault-upload-controls>select{border:1px solid #dce5e9;background:#fff;color:#536775;border-radius:7px;padding:8px 9px;font:600 9px 'DM Sans'}
 html[data-theme="dark"] .vault-upload-controls>select{background:#1b3040;border-color:#354b5a;color:#d8e5ed}
 @media(max-width:700px){.vault-upload-controls{width:100%}.vault-upload-controls>select,.vault-upload-controls .upload-button{flex:1;min-width:0}}
+
+
+/* Model training console */
+.training-panel{padding:20px;margin:10px 0 20px;max-width:980px}
+.training-icon{width:34px;height:34px;display:grid;place-items:center;border-radius:9px;background:#edf6f5;color:#25837d}
+.training-notice{margin:17px 0}
+.training-form{display:grid;gap:14px}
+.training-form label{display:grid;gap:6px;font-size:10px;font-weight:700;color:#5e707c}
+.training-form label>span{font-size:8px;font-weight:400;color:#9aa6ae}
+.dataset-picker{position:relative;display:grid;grid-template-columns:24px 1fr;align-items:center;gap:3px 9px;padding:16px;border:1px dashed #b8cece;border-radius:8px;background:#f8fbfb;color:#25837d}
+.dataset-picker strong{font-size:10px;color:#405968}.dataset-picker small{grid-column:2;color:#92a0a8;font-size:8px}.dataset-picker input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+.training-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.training-fields input{width:100%;border:1px solid #dce5e9;border-radius:6px;padding:10px;font:11px 'DM Sans';color:#183449;background:#fff}
+.training-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.training-actions>span{font-size:8px;color:#9aa6ae}
+.training-message{font-size:10px;color:#397b75}.training-job{border:1px solid #e2ebeb;background:#fbfdfd;border-radius:8px;padding:13px;margin-top:16px}.job-heading{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#29475a}.training-job>small{font-size:8px;color:#93a0a8}.job-status{display:flex;align-items:center;gap:5px;text-transform:uppercase;font-size:8px;font-weight:700;color:#a87935}.job-status.success{color:#21836e}.job-status.failed,.job-error{color:#b44c4c}.job-result{display:flex;gap:9px;margin-top:12px;color:#21836e}.job-result strong{font-size:10px}.job-result p,.job-result small{display:block;font-size:9px;color:#667985;line-height:1.5;margin:4px 0}.training-schema{border-top:1px solid #edf1f3;margin-top:17px;padding-top:13px;display:grid;gap:7px}.training-schema strong{font-size:9px;color:#71818c}.training-schema code{font-size:9px;color:#287a73;background:#edf6f5;padding:9px;border-radius:6px;overflow-wrap:anywhere}.training-schema p{font-size:8px;color:#94a1a9;line-height:1.5;margin:0}.spin{animation:training-spin 1s linear infinite}@keyframes training-spin{to{transform:rotate(360deg)}}
+html[data-theme="dark"] .training-icon{background:#1b3b3a;color:#75c7ba}
+html[data-theme="dark"] .training-form label{color:#b8c7d0}
+html[data-theme="dark"] .training-fields input{background:#1b3040;border-color:#354b5a;color:#d8e5ed}
+html[data-theme="dark"] .dataset-picker,html[data-theme="dark"] .training-job{background:#172d3c;border-color:#354b5a}
+html[data-theme="dark"] .dataset-picker strong,html[data-theme="dark"] .job-heading{color:#dce6ed}
+html[data-theme="dark"] .training-schema{border-color:#2a3d4b}
+html[data-theme="dark"] .training-schema code{background:#1b3b3a;color:#a1ddd2}
+@media(max-width:700px){.training-fields{grid-template-columns:1fr}.training-actions{align-items:flex-start;flex-direction:column}}
