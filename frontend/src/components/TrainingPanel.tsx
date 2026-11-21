@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { BrainCircuit, UploadCloud, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://127.0.0.1:8000" : "https://economic-pulse-api.onrender.com");
@@ -37,7 +37,7 @@ export default function TrainingPanel() {
     return () => window.clearInterval(timer);
   }, [job?.job_id, job?.status, token]);
 
-  async function startTraining(event: React.FormEvent<HTMLFormElement>) {
+  async function startTraining(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!file) { setMessage("Choose a CSV dataset first."); return; }
     setBusy(true); setMessage(""); setJob(null);
