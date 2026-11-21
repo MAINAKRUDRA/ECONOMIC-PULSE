@@ -74,9 +74,15 @@ def run_training(csv_path:Path,out_dir:Path,series_id:str,source_name:str|None=N
         else:
             point=flat if champion=="flat" else trend
             candidate_status="insufficient_training_rows"
-    except RuntimeError:
+    except Exception as exc:
+        # XGBoost raises its own XGBoostError (not RuntimeError) for native
+        # training failures. Fall back only for known model/runtime failures;
+        # do not hide unrelated programming or data errors.
+        is_xgboost_error = exc.__class__.__module__.startswith("xgboost")
+        if not (is_xgboost_error or isinstance(exc, (RuntimeError, OverflowError, FloatingPointError))):
+            raise
         point=flat if champion=="flat" else trend
-        candidate_status="xgboost_not_installed"
+        candidate_status=f"xgboost_training_failed:{type(exc).__name__}"
     observed_snapshot=(currently_known.sort_values(["available_at","revision"])
         .drop_duplicates("period",keep="last").sort_values("period"))
     observations=[{"series_id":series_id,"period":r.period.strftime("%Y-%m"),
