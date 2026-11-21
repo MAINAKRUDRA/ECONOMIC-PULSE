@@ -7,6 +7,7 @@ create table if not exists public.datasets (
   user_id uuid not null references auth.users(id) on delete cascade,
   series_id text not null check (length(trim(series_id)) > 0 and series_id not like 'demo\_%'),
   source_name text not null check (length(trim(source_name)) > 0),
+  source_url text not null check (source_url like 'https://%'),
   rights_tag text not null check (length(trim(rights_tag)) > 0),
   file_name text not null,
   storage_path text not null unique,
@@ -149,7 +150,7 @@ as $$
          attempt_count=attempt_count+1, updated_at=now()
    where id = (
      select id from public.training_jobs
-      where status='queued' and attempt_count < max_attempts
+      where (status='queued' or (status='running' and updated_at < now() - interval '30 minutes')) and attempt_count < max_attempts
       order by created_at
       for update skip locked
       limit 1
