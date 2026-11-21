@@ -30,6 +30,7 @@ class FakeStore:
         self.updates = []
         self.inserts = []
         self.upserts = []
+        self.select_calls = []
         self.uploads = {}
         self.csv_bytes = b""
 
@@ -38,6 +39,7 @@ class FakeStore:
         return {"id": USER_ID}
 
     def select(self, table, params):
+        self.select_calls.append((table, params))
         if table == "datasets":
             if params.get("user_id") == "eq." + USER_ID and self.dataset["user_id"] == USER_ID:
                 return [self.dataset]
@@ -150,3 +152,12 @@ def test_training_status_query_is_scoped_to_authenticated_owner(monkeypatch):
     with pytest.raises(HTTPException) as error:
         main.get_training_job(JOB_ID, "Bearer valid-session")
     assert error.value.status_code == 404
+
+
+def test_training_job_history_is_scoped_to_authenticated_owner(monkeypatch):
+    store = FakeStore()
+    monkeypatch.setattr(main, "_store", lambda: store)
+    assert main.list_training_jobs("Bearer valid-session") == []
+    table, params = store.select_calls[0]
+    assert table == "training_jobs"
+    assert params["user_id"] == "eq." + USER_ID
