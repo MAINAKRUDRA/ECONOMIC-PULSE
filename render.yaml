@@ -1,5 +1,5 @@
-# Render Blueprint: deploy the API and dashboard as separate services.
-# Create a Blueprint in Render from this repository after merging this file.
+# Render Blueprint: persistent FastAPI API and separate ML worker.
+# The React/Vite frontend is deployed to Cloudflare Pages.
 services:
   - type: web
     name: economic-pulse-api
@@ -14,14 +14,26 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.11
       - key: CORS_ORIGINS
-        value: https://economic-pulse.pages.dev,https://economic-pulse-frontend.onrender.com,http://localhost:5173,http://127.0.0.1:5173
+        value: https://economic-pulse.pages.dev,http://localhost:5173,http://127.0.0.1:5173
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
 
-  - type: web
-    name: economic-pulse-frontend
-    runtime: static
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: ./dist
+  - type: worker
+    name: economic-pulse-training-worker
+    runtime: python
+    plan: starter
+    region: singapore
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt -r ../requirements-training.txt
+    startCommand: python -m app.worker
     envVars:
-      - key: VITE_API_BASE_URL
-        value: https://economic-pulse-api.onrender.com
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: WORKER_POLL_SECONDS
+        value: "5"
