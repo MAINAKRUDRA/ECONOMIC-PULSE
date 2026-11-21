@@ -6,6 +6,7 @@ import {
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart3, CircleHelp, Database, Gauge, RefreshCw, ShieldCheck, Moon, Sun } from "lucide-react";
 import AccountPanel from "./components/AccountPanel";
 import TrainingPanel from "./components/TrainingPanel";
+import { supabase } from "./lib/supabase";
 
 type Observation = { period: string; value: number; unit: string };
 type Forecast = { median: number; lower: number | null; upper: number | null; baseline: number; horizon_end: string; unit: string; mode?: string; interval_status?: string; model_version?: string };
@@ -45,9 +46,13 @@ function App() {
 
   async function refresh() {
     try {
+      const { data: sessionData } = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+      const headers = sessionData.session?.access_token
+        ? { Authorization: "Bearer " + sessionData.session.access_token }
+        : undefined;
       const [obsRes, forecastRes] = await Promise.all([
-        fetch(`${API}/v1/observations?series_id=demo_upi`),
-        fetch(`${API}/v1/forecasts`),
+        fetch(API + "/v1/observations", { headers }),
+        fetch(API + "/v1/forecasts", { headers }),
       ]);
       if (!obsRes.ok || !forecastRes.ok) throw new Error("API unavailable");
       const obs = await obsRes.json() as ApiEnvelope<Observation[]>;
@@ -67,7 +72,18 @@ function App() {
     }
   }
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    void refresh();
+    if (!supabase) return;
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) void refresh();
+      else {
+        setObservations(sample); setForecast(sampleForecast); setSource("sample");
+        setDataAsOf("Oct 01, 2026"); setLastUpdated("Bundled demo fixture");
+      }
+    });
+    return () => listener.subscription.unsubscribe();
+  }, []);
 
   const latest = observations[observations.length - 1]?.value ?? 0;
   const previous = observations[observations.length - 2]?.value ?? latest;
