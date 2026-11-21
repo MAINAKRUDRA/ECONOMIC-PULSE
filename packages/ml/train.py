@@ -56,17 +56,17 @@ def run_training(csv_path:Path,out_dir:Path,series_id:str,source_name:str|None=N
         if len(eligible)>=30:
             models=fit_final_models(eligible)
             candidate=_count_from_log(anchor, float(models["point"].predict(xdf)[0]))
-            if champion=="xgboost":
-                point=candidate
-                models["point"].save_model(str(out_dir/"champion.ubj"))
-            else:
-                point=flat if champion=="flat" else trend
-                models["point"].save_model(str(out_dir/"challenger.ubj"))
+            # Keep the forecast and the serialized champion consistent: the
+            # point model remains the production point predictor. Quantile
+            # models provide bounds only; they never silently replace it.
+            point=candidate
+            models["point"].save_model(str(out_dir/"champion.ubj" if champion=="xgboost" else out_dir/"challenger.ubj"))
             qraw=[_count_from_log(anchor, float(models[k].predict(xdf)[0])) for k in ("q10","q50","q90")]
             qsorted=sorted(qraw)
             if champion=="xgboost" and challenger.get("interval",{}).get("calibration_adequate"):
-                lower,median_q,upper=qsorted
-                point=median_q
+                # Ensure the interval encloses the deployed point prediction.
+                lower=min(qsorted[0],point)
+                upper=max(qsorted[2],point)
                 interval_level=0.80; interval_status="validated_on_expanding_validation"
             for key in ("q10","q50","q90"):
                 models[key].save_model(str(out_dir/f"{key}.ubj"))
@@ -81,6 +81,11 @@ def run_training(csv_path:Path,out_dir:Path,series_id:str,source_name:str|None=N
         is_xgboost_error = exc.__class__.__module__.startswith("xgboost")
         if not (is_xgboost_error or isinstance(exc, (RuntimeError, OverflowError, FloatingPointError))):
             raise
+        # A failed candidate must never remain labelled as the champion.
+        for artifact in out_dir.glob("*.ubj"):
+            artifact.unlink()
+        if champion=="xgboost":
+            champion=challenger.get("best_baseline") or "flat"
         point=flat if champion=="flat" else trend
         candidate_status=f"xgboost_training_failed:{type(exc).__name__}"
     observed_snapshot=(currently_known.sort_values(["available_at","revision"])
