@@ -131,6 +131,19 @@ def create_training_job(payload: TrainingRequest, authorization: str | None = He
         store.close()
 
 
+@app.get("/v1/training-jobs")
+def list_training_jobs(authorization: str | None = Header(default=None)):
+    store = _store()
+    try:
+        user = _current_user(store, authorization)
+        return store.select("training_jobs", {
+            "select": "id,dataset_id,status,attempt_count,error,result,created_at,started_at,completed_at",
+            "user_id": f"eq.{user['id']}", "order": "created_at.desc", "limit": "20",
+        })
+    finally:
+        store.close()
+
+
 @app.get("/v1/training-jobs/{job_id}")
 def get_training_job(job_id: str, authorization: str | None = Header(default=None)):
     store = _store()
