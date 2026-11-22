@@ -67,13 +67,6 @@ FORECAST = {
 }
 
 
-def _admin_check(authorization: str | None) -> None:
-    expected = os.getenv("ECONOMIC_PULSE_ADMIN_TOKEN", "")
-    if not expected:
-        raise HTTPException(status_code=503, detail="Model-training endpoint is disabled until ECONOMIC_PULSE_ADMIN_TOKEN is configured")
-    supplied = (authorization or "").removeprefix("Bearer ").strip()
-    if not hmac.compare_digest(supplied, expected):
-        raise HTTPException(status_code=401, detail="Invalid admin token")
 
 
 
