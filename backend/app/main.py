@@ -1,13 +1,15 @@
 from __future__ import annotations
 
-import hmac
 import json
 import os
+import shutil
 import sys
 import uuid
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
+
+from .supabase_store import SupabaseStore
 
 from fastapi import BackgroundTasks, FastAPI, File, Form, Header, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -20,7 +22,7 @@ ARTIFACT_DIR = Path(os.getenv("ECONOMIC_PULSE_ARTIFACT_DIR", "/tmp/economic-puls
 ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
 PUBLISHED_FILE = Path(os.getenv("ECONOMIC_PULSE_PUBLISHED_FILE", str(ARTIFACT_DIR / "current.json")))
 MAX_UPLOAD_BYTES = 20 * 1024 * 1024
-TRAINING_JOBS: dict[str, dict[str, Any]] = {}
+
 
 app = FastAPI(
     title="Economic Pulse API",
@@ -32,7 +34,7 @@ cors_origins = [
     origin.strip()
     for origin in os.getenv(
         "CORS_ORIGINS",
-        "https://economic-pulse.pages.dev,http://localhost:5173,http://127.0.0.1:5173",
+        "https://economic-pulse.pages.dev,https://economic-pulse-frontend.onrender.com,http://localhost:5173,http://127.0.0.1:5173",
     ).split(",")
     if origin.strip()
 ]
@@ -65,16 +67,41 @@ FORECAST = {
 }
 
 
-def _admin_check(authorization: str | None) -> None:
-    expected = os.getenv("ECONOMIC_PULSE_ADMIN_TOKEN", "")
-    if not expected:
-        raise HTTPException(status_code=503, detail="Model-training endpoint is disabled until ECONOMIC_PULSE_ADMIN_TOKEN is configured")
-    supplied = (authorization or "").removeprefix("Bearer ").strip()
-    if not hmac.compare_digest(supplied, expected):
-        raise HTTPException(status_code=401, detail="Invalid admin token")
+
+
+
+def _store(required: bool = True):
+    try:
+        return SupabaseStore()
+    except RuntimeError as exc:
+        if required:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
+        return None
+
+
+def _authenticated_user(authorization: str | None):
+    token = (authorization or "").removeprefix("Bearer ").strip()
+    if not token:
+        raise HTTPException(status_code=401, detail="A Supabase access token is required")
+    try:
+        return _store().authenticate(token)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=401, detail="Invalid or expired Supabase session") from exc
 
 
 def published_bundle():
+    store = _store(required=False)
+    if store:
+        try:
+            payload = store.latest_bundle()
+            if payload:
+                if payload.get("mode") not in {"synthetic", "research"} or not isinstance(payload.get("forecasts"), list) or not isinstance(payload.get("observations"), list):
+                    raise ValueError("Invalid publication schema")
+                return payload
+        except Exception as exc:
+            raise HTTPException(status_code=503, detail="Could not load the published bundle from Supabase Storage") from exc
     if not PUBLISHED_FILE.exists():
         return None
     try:
@@ -94,32 +121,54 @@ def envelope(data, mode="synthetic", batch_id="demo_v1", data_as_of=None):
         "generated_at": datetime.now(timezone.utc).isoformat()}}
 
 
-def _train_uploaded_csv(job_id: str, csv_path: Path, series_id: str, source_name: str, rights_tag: str):
-    job = TRAINING_JOBS[job_id]
-    job["status"] = "training"
+def _train_uploaded_csv(job_id: str, user_id: str, dataset_path: str,
+                        series_id: str, source_name: str, rights_tag: str):
+    store = _store()
+    now = datetime.now(timezone.utc).isoformat()
+    store.update_job(job_id, {"status": "training", "updated_at": now})
     try:
         from packages.ml.train import run_training
         from packages.ml.publish_bundle import publish_local_bundle, validate_bundle
 
-        output_dir = ARTIFACT_DIR / "runs" / job_id
-        result = run_training(csv_path, output_dir, series_id, source_name, rights_tag)
-        validation = validate_bundle(output_dir)
+        run_dir = ARTIFACT_DIR / "runs" / job_id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        csv_path = ARTIFACT_DIR / "uploads" / f"{job_id}.csv"
+        csv_path.parent.mkdir(parents=True, exist_ok=True)
+        csv_path.write_bytes(store.download_dataset(dataset_path))
+        result = run_training(csv_path, run_dir, series_id, source_name, rights_tag)
+        validation = validate_bundle(run_dir)
         if not validation.get("valid") or validation.get("mode") != "research":
             raise ValueError("Research model bundle did not pass publication validation")
-        publication = publish_local_bundle(output_dir, PUBLISHED_FILE)
-        job.update({
-            "status": "completed",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
+        publication = publish_local_bundle(run_dir, PUBLISHED_FILE)
+        bundle_bytes = PUBLISHED_FILE.read_bytes()
+        archive_base = ARTIFACT_DIR / "archives" / job_id
+        archive_base.parent.mkdir(parents=True, exist_ok=True)
+        archive_path = Path(shutil.make_archive(str(archive_base), "zip", root_dir=run_dir))
+        store.save_artifacts(
+            user_id, job_id, series_id, archive_path.read_bytes(), bundle_bytes,
+            json.loads(bundle_bytes.decode("utf-8")).get("manifest", {}),
+        )
+        final_result = {
             "forecast": result["forecast"],
             "backtest_status": result["backtest_status"],
             "challenger_status": result["challenger_status"],
             "candidate_status": result["forecast"]["candidate_status"],
             "publication": publication,
             "validation": validation,
+        }
+        store.update_job(job_id, {
+            "status": "completed", "result": final_result,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(timezone.utc).isoformat(),
         })
     except Exception as exc:
-        job.update({"status": "failed", "error": str(exc)[:1000],
-                    "completed_at": datetime.now(timezone.utc).isoformat()})
+        store.update_job(job_id, {
+            "status": "failed", "error": str(exc)[:1000],
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+            "completed_at": datetime.now(timezone.utc).isoformat(),
+        })
+    finally:
+        (ARTIFACT_DIR / "uploads" / f"{job_id}.csv").unlink(missing_ok=True)
 
 
 @app.get("/health/live")
@@ -136,7 +185,7 @@ async def start_training(
     rights_tag: str = Form(...),
     authorization: str | None = Header(default=None),
 ):
-    _admin_check(authorization)
+    user = _authenticated_user(authorization)
     if not file.filename or not file.filename.lower().endswith(".csv"):
         raise HTTPException(status_code=400, detail="Upload a CSV file")
     if not series_id.strip() or series_id.startswith("demo_"):
@@ -148,27 +197,36 @@ async def start_training(
         raise HTTPException(status_code=400, detail="Uploaded CSV is empty")
     if len(content) > MAX_UPLOAD_BYTES:
         raise HTTPException(status_code=413, detail="CSV exceeds the 20 MB upload limit")
-    job_id = uuid.uuid4().hex
-    upload_dir = ARTIFACT_DIR / "uploads"
-    upload_dir.mkdir(parents=True, exist_ok=True)
-    csv_path = upload_dir / f"{job_id}.csv"
-    csv_path.write_bytes(content)
-    TRAINING_JOBS[job_id] = {
-        "job_id": job_id, "status": "queued", "series_id": series_id.strip(),
-        "source_name": source_name.strip(), "created_at": datetime.now(timezone.utc).isoformat(),
-    }
-    background_tasks.add_task(_train_uploaded_csv, job_id, csv_path, series_id.strip(), source_name.strip(), rights_tag.strip())
-    return {"job_id": job_id, "status": "queued", "status_url": f"/v1/admin/train/{job_id}",
-            "message": "Training queued. Poll the status URL for evaluation and publication results."}
+    job_id = str(uuid.uuid4())
+    store = _store()
+    safe_name = Path(file.filename).name.replace("/", "_").replace("\\", "_")[:100]
+    dataset = store.create_dataset(user["id"], safe_name, content, source_name.strip(), rights_tag.strip())
+    store.create_job(job_id, user["id"], dataset["id"], series_id.strip(), source_name.strip(), rights_tag.strip())
+    background_tasks.add_task(
+        _train_uploaded_csv, job_id, user["id"], dataset["storage_path"],
+        series_id.strip(), source_name.strip(), rights_tag.strip(),
+    )
+    return {"job_id": job_id, "status": "queued",
+            "status_url": f"/v1/admin/train/{job_id}",
+            "message": "Training queued. Dataset and job metadata are persisted in Supabase."}
 
 
 @app.get("/v1/admin/train/{job_id}")
 def training_status(job_id: str, authorization: str | None = Header(default=None)):
-    _admin_check(authorization)
-    job = TRAINING_JOBS.get(job_id)
+    user = _authenticated_user(authorization)
+    try:
+        job = _store().get_job(job_id, user["id"])
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Could not retrieve training job") from exc
     if not job:
-        raise HTTPException(status_code=404, detail="Training job not found on this API instance")
-    return job
+        raise HTTPException(status_code=404, detail="Training job not found for this account")
+    result = job.get("result") or {}
+    return {
+        "job_id": str(job["id"]), "status": job["status"],
+        "series_id": job["series_id"], "source_name": job["source_name"],
+        "created_at": job["created_at"], "completed_at": job.get("completed_at"),
+        "error": job.get("error"), **result,
+    }
 
 
 @app.get("/v1/status")

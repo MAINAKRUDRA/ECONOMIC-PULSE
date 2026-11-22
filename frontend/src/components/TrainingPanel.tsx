@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { BrainCircuit, UploadCloud, FileSpreadsheet, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
+import { supabase } from "../lib/supabase";
 
 const API = import.meta.env.VITE_API_BASE_URL || (import.meta.env.DEV ? "http://127.0.0.1:8000" : "https://economic-pulse-api.onrender.com");
 
@@ -15,7 +16,6 @@ export default function TrainingPanel() {
   const [seriesId, setSeriesId] = useState("upi_monthly");
   const [sourceName, setSourceName] = useState("");
   const [rightsTag, setRightsTag] = useState("approved-public-use");
-  const [token, setToken] = useState("");
   const [job, setJob] = useState<Job | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
@@ -24,8 +24,10 @@ export default function TrainingPanel() {
     if (!job?.job_id || !["queued", "training"].includes(job.status)) return;
     const timer = window.setInterval(async () => {
       try {
+        const { data: authData } = await supabase?.auth.getSession() ?? { data: { session: null } };
+        if (!authData.session) throw new Error("Sign in again to continue checking this training job.");
         const response = await fetch(`${API}/v1/admin/train/${job.job_id}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: { Authorization: `Bearer ${authData.session.access_token}` },
         });
         if (!response.ok) throw new Error(response.status === 404 ? "Job not found on this API instance. The service may have restarted." : "Could not read training status.");
         const next = await response.json() as Job;
@@ -35,11 +37,14 @@ export default function TrainingPanel() {
       }
     }, 2500);
     return () => window.clearInterval(timer);
-  }, [job?.job_id, job?.status, token]);
+  }, [job?.job_id, job?.status]);
 
   async function startTraining(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!file) { setMessage("Choose a CSV dataset first."); return; }
+    if (!supabase) { setMessage("Supabase is not configured for this deployment."); return; }
+    const { data: authData } = await supabase.auth.getSession();
+    if (!authData.session) { setMessage("Sign in to your Economic Pulse account before starting model training."); return; }
     setBusy(true); setMessage(""); setJob(null);
     const body = new FormData();
     body.append("file", file);
@@ -48,7 +53,7 @@ export default function TrainingPanel() {
     body.append("rights_tag", rightsTag.trim());
     try {
       const response = await fetch(`${API}/v1/admin/train`, {
-        method: "POST", headers: { Authorization: `Bearer ${token.trim()}` }, body,
+        method: "POST", headers: { Authorization: `Bearer ${authData.session.access_token}` }, body,
       });
       const result = await response.json();
       if (!response.ok) throw new Error(result.detail || "Training request failed.");
@@ -71,9 +76,9 @@ export default function TrainingPanel() {
         <label>Series ID<input required value={seriesId} onChange={e => setSeriesId(e.target.value)} placeholder="upi_monthly" /></label>
         <label>Source name<input required value={sourceName} onChange={e => setSourceName(e.target.value)} placeholder="RBI Payment System Indicators" /></label>
         <label>Data rights tag<input required value={rightsTag} onChange={e => setRightsTag(e.target.value)} placeholder="approved-public-use" /></label>
-        <label>Admin API token<input required type="password" autoComplete="off" value={token} onChange={e => setToken(e.target.value)} placeholder="Configured on the backend service" /></label>
+
       </div>
-      <div className="training-actions"><button className="account-button" type="submit" disabled={busy || !!running || !token.trim()}>{busy ? <Loader2 size={14} className="spin"/> : <UploadCloud size={14}/>} {busy ? "Submitting…" : "Start model training"}</button><span>Token stays in this page's memory and is sent only to the API.</span></div>
+      <div className="training-actions"><button className="account-button" type="submit" disabled={busy || !!running || !supabase}>{busy ? <Loader2 size={14} className="spin"/> : <UploadCloud size={14}/>} {busy ? "Submitting…" : "Start model training"}</button><span>Uses your signed-in Supabase account. Your dataset and job are stored under your user ID.</span></div>
     </form>
     {message && <p className="training-message" role="status">{message}</p>}
     {job && <div className="training-job">

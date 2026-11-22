@@ -76,3 +76,45 @@ Downloads use short-lived signed URLs (60 seconds). The bucket must remain priva
 7. Delete the test file and confirm both the Storage object and metadata row are removed.
 
 Collect only business registration information that is actually needed. Do not upload passwords, API keys, payment-card data, or unnecessary identity documents.
+
+
+## 7. Production ML persistence (third migration)
+
+Run the complete SQL contents of
+`supabase/migrations/20261122150000_production_ml_persistence.sql`
+in the Supabase SQL Editor, after the two migrations above. Do not paste the filename itself.
+
+This migration creates owner-scoped `datasets`, `training_jobs` and
+`model_artifacts` tables, a published-bundle registry, and private
+`economic-datasets` and `model-artifacts` Storage buckets. RLS protects
+user-visible records and Storage paths. The API uses a server-only service
+role key and verifies each user's Supabase access token before accepting
+training requests or returning a job.
+
+### Render API environment
+
+Set these variables on the Render `economic-pulse-api` service:
+
+- `SUPABASE_URL` — the Supabase project URL.
+- `SUPABASE_SERVICE_ROLE_KEY` — the server-side service-role key from the
+  Supabase project API settings. Keep this secret; never add it to the
+  frontend, a `VITE_*` variable, source control, or client logs.
+
+Keep `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` on the frontend
+service only. After changing the API environment, allow Render to restart.
+
+### Production verification
+
+1. Sign in to Economic Pulse.
+2. Open Model training and upload a permitted CSV.
+3. Confirm a row appears in `datasets` and `training_jobs`.
+4. Confirm the CSV object appears in the private `economic-datasets` bucket.
+5. Poll the job and verify its status is persisted after refreshing the page.
+6. After a successful run, confirm a `model_artifacts` row, an object in
+   `model-artifacts`, and a row in `published_bundles`.
+7. Sign in as a second user and verify the first user's datasets and jobs
+   are not returned.
+
+The API currently executes training as a FastAPI background task. Job state,
+input datasets, artifacts and publication bundles are stored in Supabase;
+a separate durable worker/queue is still recommended before high-volume use.
