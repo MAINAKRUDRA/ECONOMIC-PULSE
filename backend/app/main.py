@@ -85,6 +85,8 @@ def _authenticated_user(authorization: str | None):
         raise HTTPException(status_code=401, detail="A Supabase access token is required")
     try:
         return _store().authenticate(token)
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=401, detail="Invalid or expired Supabase session") from exc
 
